@@ -1,15 +1,20 @@
-# Phase 3 plan: "Hey Jarvis" wake word
+# Phase 3 plan: "Hey Jarvis" Wake Word & Voice Customization
 
-Status: **plan only, waiting for David's approval. Nothing below has been built.**
+Status: **plan updated with voice customization (speed, voice switching, flair), waiting for David's approval. Nothing below has been built.**
 
 ## Goal
 
-Run `voice.bat` and leave it running. Say "Hey Jarvis", hear a short chime, ask your question, and hear the answer. Then it goes back to listening for the wake word, with no Enter key needed. The current press-Enter mode stays available as a fallback.
+1. **Hands-free wake word:** Run `voice.bat` and leave it running. Say "Hey Jarvis", hear a short chime, ask your question, and hear the answer. Then it goes back to listening for the wake word, with no Enter key needed. The current press-Enter mode stays available as a fallback.
+2. **Voice speed control:** Adjust how fast Jarvis speaks (e.g., 1.0x to 1.5x) via `JARVIS_VOICE_SPEED` in `.env` or in-session commands, so answers feel snappier.
+3. **Voice switching & selection:** List installed Windows and Kokoro voices (`/voices`), switch voices (`/voice <name>`), and have Jarvis accurately explain its voice settings when asked.
+4. **Natural voice & flair:** Easy activation of Kokoro neural voice (natural British & American inflections with realistic cadence, moving away from robotic Windows monotone).
 
 **Done when:**
 - It wakes from normal speaking distance (about 2 m) at least 8 times out of 10 in a quiet room.
 - It wakes by itself fewer than about once an hour with the TV or music on.
 - It never wakes from its own voice while it is speaking.
+- Spoken voice speed can be adjusted smoothly (both Windows SAPI rate and Kokoro speed).
+- Jarvis can list available voices and accurately answer "how do I change your voice?" without claiming the feature does not exist.
 
 ## How it will work
 
@@ -32,24 +37,34 @@ mic (16 kHz) ──► wake detector (openWakeWord "hey_jarvis") ──► chime
 |---|---|
 | `jarvis/wake.py` | New: `WakeDetector` (model loading, scoring, threshold, cooldown) and `make_chime()` |
 | `jarvis/listen.py` | Add a shared `MicStream` that yields frames; `record_utterance()` can take frames from it instead of opening its own stream |
-| `jarvis/voice.py` | New wake loop, used by default when the wake model is available; `--push-to-talk` keeps today's Enter mode |
-| `jarvis/config.py` | `JARVIS_WAKE` (`on`/`off`), `WAKE_THRESHOLD` (default 0.5), with clear errors for bad values |
-| `.env.example`, `README.md` | Document the new settings and how to adjust sensitivity |
-| `requirements-voice.txt` | Add `openwakeword` (see the disk decision below) |
-| `tests/test_wake.py` | New tests (below) |
+| `jarvis/voice.py` | New wake loop (`voice.bat`); add `/speed`, `/voices`, and `/voice` interactive commands |
+| `jarvis/tts.py` | Expose speech rate/speed in `WindowsVoice` (SAPI `Rate`) and `KokoroVoice` (`speed`); add `list_voices()` |
+| `jarvis/config.py` | `JARVIS_WAKE` (`on`/`off`), `WAKE_THRESHOLD` (default 0.5), `JARVIS_VOICE_SPEED` (default 1.1) |
+| `jarvis/personality.py` | Give Jarvis context on its voice capabilities so it can explain how to change voices/speed accurately |
+| `.env.example`, `README.md` | Document wake word and voice speed/switching settings |
+| `requirements-voice.txt` | Add `openwakeword` |
+| `tests/test_wake.py` | Automated wake tests |
+| `tests/test_tts.py` | Tests for rate/speed adjustments and voice switching |
 
-`brain.py`, `providers.py`, `tts.py`, `setup.py` and `.env` are not touched.
+`brain.py`, `providers.py`, `setup.py` and `.env` are not touched.
 
 ## Tests
 
-All of these use fake score streams or recorded numbers, with no mic needed:
+All of these use fake score streams, mock engines, or recorded numbers with no mic needed:
 
-- Fires once when scores cross the threshold, and not again during the 2 s cooldown.
-- Never fires below the threshold, including on a single noisy spike.
-- Paused while speaking: scores during speech are ignored, and the buffer is cleared afterwards.
-- A bad `WAKE_THRESHOLD` (for example `high` or `1.7`) gives a clear setup error.
-- `make_chime()` returns short, non-silent 16 kHz audio.
-- Shared-stream recorder: the `Endpointer` gets the same stop decisions as today when fed frames from the stream.
+- **Wake Detector**:
+  - Fires once when scores cross threshold; cooldown ignores subsequent spikes for 2s.
+  - Never fires below threshold.
+  - Paused while Jarvis speaks; clears buffer immediately after speech finishes.
+  - Invalid `WAKE_THRESHOLD` produces a clean, descriptive error.
+  - `make_chime()` generates 16 kHz audio without external asset files.
+- **Voice Customization & Speed**:
+  - `WindowsVoice` rate maps properly to SAPI Rate bounds (-10 to +10).
+  - `KokoroVoice` propagates speed factor (e.g. 1.25x) to ONNX synthesis.
+  - Voice switching accurately selects between installed Windows voices and Kokoro neural voice profiles.
+  - Jarvis prompt accurately reflects voice settings when user asks "how do I change your voice".
+- **Shared Stream Recorder**:
+  - `Endpointer` accurately segments silence/speech when fed continuous frames from `MicStream`.
 
 **Live check, run once on your PC:** Windows speaks "Hey Jarvis, what time is it?" into a WAV file (the same trick used to test Phase 2). The file goes through the real detector and recorder, and must wake and transcribe correctly. Then you try it with your own voice, which is the only part I can't check for you.
 
@@ -87,6 +102,8 @@ Checked against correctness, failure paths and setup:
 
 ## Decisions for David
 
-1. Approve this plan, or change it.
-2. Disk: Option A (try a ~10 MB install first, recommended) or Option B (normal ~200 MB install).
+1. Approve this updated plan, or change it.
+2. Disk for Wake Word: Option A (try a ~10 MB install first, recommended) or Option B (normal ~200 MB install).
 3. Should wake mode become the default for `voice.bat`, with Enter mode behind `--push-to-talk`, or the other way round?
+4. Preferred default voice speed: Standard 1.0x or slightly accelerated 1.15x–1.2x?
+5. Voice flair: Shall we add a quick one-step setup for the natural Kokoro offline voice (British George / Lewis) to replace the robotic Windows SAPI default?
