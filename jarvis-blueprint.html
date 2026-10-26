@@ -1,0 +1,328 @@
+<title>Project Jarvis Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,800&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workshop spec sheet. Single reading column, wide tables scroll in place, one HUD mockup as the visual moment. */
+:root{
+  --bg:#f3f4f6; --surface:#ffffff; --ink:#15191f; --muted:#59616d; --line:#d7dbe1;
+  --accent:#b4441c; --accent-soft:#f6e3da; --core:#1d6f8f; --core-soft:#dceef4;
+  --ok:#2c7a46; --ok-soft:#e1f1e6; --warn:#9a6a00; --warn-soft:#f7eccc; --no:#a32a2a; --no-soft:#f6dede;
+  --hud-bg:#0d1419; --hud-ink:#cfe6ee; --hud-dim:#6f8a95; --hud-glow:#59c3e3;
+  --display:"Archivo","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161b; --surface:#1a2027; --ink:#e7eaee; --muted:#9aa3ae; --line:#2d3540;
+  --accent:#ec7a4f; --accent-soft:#3a2219; --core:#5cb8d8; --core-soft:#16303a;
+  --ok:#6cc68b; --ok-soft:#173022; --warn:#e3b54a; --warn-soft:#352a10; --no:#ef7d7d; --no-soft:#3a1a1a;
+  --hud-bg:#070b0e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161b; --surface:#1a2027; --ink:#e7eaee; --muted:#9aa3ae; --line:#2d3540;
+  --accent:#ec7a4f; --accent-soft:#3a2219; --core:#5cb8d8; --core-soft:#16303a;
+  --ok:#6cc68b; --ok-soft:#173022; --warn:#e3b54a; --warn-soft:#352a10; --no:#ef7d7d; --no-soft:#3a1a1a;
+  --hud-bg:#070b0e; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 72px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--display);font-stretch:112%;text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(2.1rem,6vw,3.4rem);font-weight:800;letter-spacing:-.01em}
+h2{font-size:clamp(1.45rem,3.4vw,1.9rem);font-weight:800}
+h3{font-size:1.1rem;font-weight:600}
+p{margin:0;max-width:68ch}
+a{color:var(--core)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font:500 .75rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+section{display:flex;flex-direction:column;gap:18px}
+.lede{font-size:1.15rem;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.9em}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+
+/* header */
+header{display:flex;flex-direction:column;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:28px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;font:400 .82rem var(--mono);color:var(--muted)}
+
+/* verdict */
+.verdict{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.vcell{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--c);padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.vcell b{font-family:var(--display);font-stretch:112%;font-size:1.05rem;color:var(--c)}
+.vcell p{font-size:.95rem}
+
+/* pipeline */
+.pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px}
+.stage{flex:1 1 130px;min-width:0;background:var(--surface);border:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.stage .k{font:500 .7rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.stage .n{font-weight:600}
+.stage .t{font:400 .8rem var(--mono);color:var(--core)}
+.stage.brain{border-color:var(--accent);background:var(--accent-soft)}
+.arrow{align-self:center;color:var(--muted);font-family:var(--mono)}
+@media (max-width:640px){.arrow{display:none}}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.93rem}
+th,td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--line)}
+th{font:500 .72rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600}
+.pill{display:inline-block;font:500 .72rem var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px;white-space:nowrap}
+.yes{background:var(--ok-soft);color:var(--ok)}
+.lim{background:var(--warn-soft);color:var(--warn)}
+.no{background:var(--no-soft);color:var(--no)}
+
+/* tiers */
+.tiers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tier{background:var(--surface);border:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.tier ul{margin:0;padding-left:18px;font-size:.92rem;display:flex;flex-direction:column;gap:4px}
+.tier .spec{font:400 .82rem var(--mono);color:var(--core)}
+
+/* phases */
+.phases{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border-left:2px solid var(--line)}
+.phase{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:18px 0 18px 20px;position:relative}
+.phase::before{content:"";position:absolute;left:-7px;top:24px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+.phase .when{font:500 .78rem var(--mono);color:var(--muted);padding-top:3px}
+.phase .body{display:flex;flex-direction:column;gap:8px}
+.phase .num{font:500 .72rem var(--mono);color:var(--accent);letter-spacing:.1em}
+.phase .tools{font:400 .82rem var(--mono);color:var(--core)}
+.done{font-size:.9rem;border-left:3px solid var(--ok);padding:4px 0 4px 10px;color:var(--muted)}
+.done b{color:var(--ok);font-weight:600}
+@media (max-width:560px){.phase{grid-template-columns:minmax(0,1fr);gap:4px}}
+
+/* HUD mockup */
+.hud{background:var(--hud-bg);color:var(--hud-ink);border-radius:6px;padding:22px;display:grid;grid-template-columns:minmax(0,1fr) 260px minmax(0,1fr);gap:20px;font-family:var(--mono);font-size:.8rem;overflow:hidden}
+.hud h4{margin:0 0 10px;font:500 .68rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--hud-dim)}
+.hud .panel{display:flex;flex-direction:column;gap:10px;min-width:0}
+.hud .line{border-left:2px solid #24414c;padding-left:10px;line-height:1.5}
+.hud .you{color:var(--hud-dim)}
+.hud .jv{color:var(--hud-ink)}
+.hud .ok{color:#7fd69b}
+.hud .stat{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed #1f3640;padding-bottom:5px;font-variant-numeric:tabular-nums}
+.orbbox{display:flex;flex-direction:column;align-items:center;gap:14px;justify-content:center}
+.orb{width:200px;height:200px;max-width:100%;aspect-ratio:1;position:relative}
+.orb span{position:absolute;inset:0;border-radius:50%;border:1px solid var(--hud-glow)}
+.orb .r1{inset:0;border-style:dashed;opacity:.45;animation:spin 40s linear infinite}
+.orb .r2{inset:18px;border-width:2px;border-color:var(--hud-glow) transparent var(--hud-glow) transparent;opacity:.8;animation:spin 14s linear infinite reverse}
+.orb .r3{inset:44px;opacity:.6}
+.orb .core{inset:66px;background:radial-gradient(circle,#bdf0ff 0%,var(--hud-glow) 40%,rgba(89,195,227,.08) 72%);border:0;animation:breathe 3.2s ease-in-out infinite}
+.orbbox .status{letter-spacing:.2em;color:var(--hud-glow)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes breathe{50%{transform:scale(.9);opacity:.8}}
+@media (prefers-reduced-motion:reduce){.orb span{animation:none!important}}
+@media (max-width:820px){.hud{grid-template-columns:minmax(0,1fr)}.orbbox{order:-1}}
+
+/* cards for not possible */
+.nogrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.nocard{background:var(--surface);border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.nocard .instead{font-size:.9rem;color:var(--muted)}
+.nocard .instead b{color:var(--core);font-weight:600}
+@media (max-width:760px){.verdict,.tiers,.nogrid{grid-template-columns:minmax(0,1fr)}}
+
+.callout{background:var(--core-soft);border:1px solid var(--core);padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.callout b{color:var(--core)}
+ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+.sources{font-size:.85rem;columns:2 300px;column-gap:28px;padding-left:18px;margin:0}
+.sources li{break-inside:avoid;margin-bottom:6px}
+footer{border-top:1px solid var(--line);padding-top:18px;font-size:.85rem;color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">Feasibility study · Implementation plan</span>
+  <h1>Project Jarvis Blueprint</h1>
+  <p class="lede">Can one person build a working J.A.R.V.I.S. in 2026 with free software? Mostly yes. The voice, the brain, the memory and the hands are all buildable today with open-source parts. The holograms and the suit are not.</p>
+  <div class="meta"><span>Researched 20 Oct 2026</span><span>Target: Windows PC you already own</span><span>Software budget: $0</span></div>
+</header>
+
+<section>
+  <span class="eyebrow">The short answer</span>
+  <h2>What you can actually have</h2>
+  <div class="verdict">
+    <div class="vcell" style="--c:var(--ok)"><b>Buildable now, free</b><p>Say “Hey Jarvis”, talk naturally, get a spoken answer in a British voice, have it open apps, search the web, check weather, remember things about you, see through your webcam, and message you on your phone.</p></div>
+    <div class="vcell" style="--c:var(--warn)"><b>Buildable with limits</b><p>Speed and intelligence depend on your hardware. Free cloud AI is smarter but rate-limited and may train on your data. Whole-house listening needs cheap microphones you would have to buy.</p></div>
+    <div class="vcell" style="--c:var(--no)"><b>Not possible today</b><p>Mid-air holograms you can touch, the Iron Man suit, a truly conscious AI, and “hacking into anything”. These are limits of physics, energy and law, not of your skill.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">How a Jarvis works</span>
+  <h2>Every voice assistant is the same seven-stage pipeline</h2>
+  <p>Movie Jarvis feels like one magic mind. In practice it is a chain of small, separate programs. Each one is a free open-source component you can swap out later.</p>
+  <div class="pipe">
+    <div class="stage"><span class="k">1 · Listen</span><span class="n">Microphone</span><span class="t">sounddevice</span></div><span class="arrow">→</span>
+    <div class="stage"><span class="k">2 · Wake</span><span class="n">“Hey Jarvis”</span><span class="t">openWakeWord</span></div><span class="arrow">→</span>
+    <div class="stage"><span class="k">3 · Hear</span><span class="n">Speech → text</span><span class="t">faster-whisper</span></div><span class="arrow">→</span>
+    <div class="stage brain"><span class="k">4 · Think</span><span class="n">Brain (LLM)</span><span class="t">Ollama / Gemini</span></div><span class="arrow">→</span>
+    <div class="stage"><span class="k">5 · Act</span><span class="n">Tools</span><span class="t">Python functions</span></div><span class="arrow">→</span>
+    <div class="stage"><span class="k">6 · Remember</span><span class="n">Memory</span><span class="t">SQLite + Chroma</span></div><span class="arrow">→</span>
+    <div class="stage"><span class="k">7 · Speak</span><span class="n">Text → voice</span><span class="t">Kokoro / Piper</span></div>
+  </div>
+  <p class="muted small">Side inputs feed stage 4 too: webcam (vision), a Telegram bot (your phone), and a scheduler (morning briefings, reminders).</p>
+</section>
+
+<section>
+  <span class="eyebrow">Findings</span>
+  <h2>Feasibility board</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Capability</th><th>Verdict</th><th>Free way to do it</th><th>Reality check</th></tr></thead>
+    <tbody>
+      <tr><td>Wake on “Hey Jarvis”</td><td><span class="pill yes">Possible</span></td><td>openWakeWord ships a pre-trained <code>hey_jarvis</code> model. Runs on CPU, fully offline.</td><td>Accuracy depends on your mic and room noise. Test at normal speaking distance.</td></tr>
+      <tr><td>Understand your speech</td><td><span class="pill yes">Possible</span></td><td>faster-whisper or whisper.cpp offline. Parakeet is much faster on CPU for English.</td><td>Whisper handles many languages, including Swahili. Parakeet is mainly for English and European languages.</td></tr>
+      <tr><td>Natural spoken replies</td><td><span class="pill yes">Possible</span></td><td>Kokoro (82M params, Apache 2.0, has British male voices). Piper for very weak hardware.</td><td>Good quality, not quite human. Both run offline.</td></tr>
+      <tr><td>Conversation and reasoning</td><td><span class="pill lim">With limits</span></td><td>Local: Ollama with a small model such as Qwen3, Llama or Gemma. Cloud: free Gemini, Groq or OpenRouter tiers.</td><td>Small local models are noticeably less smart than ChatGPT or Claude. Free cloud tiers cap requests per day.</td></tr>
+      <tr><td>Control your PC</td><td><span class="pill yes">Possible</span></td><td>Tool calling: the model picks a Python function such as <code>open_app</code>, <code>search_web</code> or <code>set_timer</code>. MCP is the standard way to plug in more tools.</td><td>Only does what you wrote a tool for. Ask for confirmation before anything that deletes, sends or pays.</td></tr>
+      <tr><td>Long-term memory</td><td><span class="pill yes">Possible</span></td><td>SQLite for facts and reminders, Chroma for searching past conversations by meaning.</td><td>It remembers what you store, not everything. You design what it keeps.</td></tr>
+      <tr><td>Sees through a camera</td><td><span class="pill lim">With limits</span></td><td>Vision models: Gemma 3 or Moondream locally, or Gemini free tier.</td><td>Snapshot on request works well. Continuous live video analysis is slow on a normal PC.</td></tr>
+      <tr><td>Reach you on your phone</td><td><span class="pill yes">Possible</span></td><td>Telegram bot API is free. Text Jarvis from anywhere; it answers from your PC.</td><td>Your PC must stay on and online.</td></tr>
+      <tr><td>Smart home control</td><td><span class="pill lim">With limits</span></td><td>Home Assistant is free and open source, with local Whisper, Piper and openWakeWord add-ons.</td><td>Software is free; smart plugs, bulbs and sensors cost money.</td></tr>
+      <tr><td>Instant, interruptible chat</td><td><span class="pill lim">With limits</span></td><td>Silero VAD for detecting when you stop or start talking; streaming TTS.</td><td>Estimate 1–3 s per reply on a mid-range PC. Movie-speed needs a good GPU or a fast cloud model like Groq.</td></tr>
+      <tr><td>Paul Bettany’s exact voice</td><td><span class="pill no">Don’t</span></td><td>Pick a stock British voice instead.</td><td>Cloning a real actor’s voice without permission raises legal and ethical problems.</td></tr>
+      <tr><td>Holographic interface</td><td><span class="pill no">Not possible</span></td><td>A screen-based HUD (see mockup below).</td><td>No consumer mid-air hologram exists in 2026. Lab prototypes show simple icons only.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="eyebrow">Physics and limits</span>
+  <h2>What stays in the movies, and what to build instead</h2>
+  <div class="nogrid">
+    <div class="nocard"><h3>Floating holograms you can touch</h3><p class="small">True mid-air holography is still experimental. Shipping “holographic” products are light-field screens and tables costing roughly $1K to $50K+, and experts put mainstream free-space holograms in the 2030s.</p><p class="instead"><b>Instead:</b> an animated HUD on a monitor or projector, or a Pepper’s-ghost reflection box built from glass and a phone.</p></div>
+    <div class="nocard"><h3>The Iron Man suit</h3><p class="small">No battery stores enough energy in that size to fly a person, and nothing produces “repulsor” thrust. This is a physics limit, not a software one.</p><p class="instead"><b>Instead:</b> Jarvis on your phone and earbuds, which is the useful part of the suit.</p></div>
+    <div class="nocard"><h3>A conscious, all-knowing AI</h3><p class="small">Current models predict text. They can be wrong with confidence, have no feelings, and know only what they were trained on or what your tools fetch.</p><p class="instead"><b>Instead:</b> give it good tools (web search, weather, calendar) so it looks things up instead of guessing.</p></div>
+    <div class="nocard"><h3>Control over any system</h3><p class="small">Movie Jarvis hacks satellites and networks. A real assistant can only touch systems that offer an API you have permission to use.</p><p class="instead"><b>Instead:</b> connect your own accounts and devices, one tool at a time.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The free stack</span>
+  <h2>Every part, and its zero-cost option</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>Offline / local (private)</th><th>Free cloud (smarter or faster)</th><th>Pick first</th></tr></thead>
+    <tbody>
+      <tr><td>Language</td><td colspan="2">Python 3.11 or 3.12, VS Code, Git</td><td>Python 3.11</td></tr>
+      <tr><td>Wake word</td><td>openWakeWord (<code>hey_jarvis</code>)</td><td>none needed</td><td>openWakeWord</td></tr>
+      <tr><td>Voice detection</td><td>Silero VAD</td><td>none needed</td><td>Silero VAD</td></tr>
+      <tr><td>Speech → text</td><td>faster-whisper, whisper.cpp, Parakeet</td><td>Groq Whisper (free tier)</td><td>faster-whisper <code>small</code></td></tr>
+      <tr><td>Brain</td><td>Ollama + Qwen3 / Llama / Gemma (pick a model with the “tools” tag)</td><td>Gemini API (AI Studio), Groq, OpenRouter <code>:free</code> models</td><td>Gemini free tier, Ollama as backup</td></tr>
+      <tr><td>Text → speech</td><td>Kokoro, Piper</td><td>Edge TTS voices (unofficial)</td><td>Kokoro</td></tr>
+      <tr><td>Tools / plugins</td><td>Your own Python functions, MCP servers</td><td>DuckDuckGo search, Open-Meteo weather (no key)</td><td>Python functions</td></tr>
+      <tr><td>Memory</td><td>SQLite, Chroma</td><td>none needed</td><td>SQLite first</td></tr>
+      <tr><td>Phone access</td><td colspan="2">Telegram Bot API (free)</td><td>python-telegram-bot</td></tr>
+      <tr><td>Smart home</td><td colspan="2">Home Assistant (free, needs devices)</td><td>Later</td></tr>
+      <tr><td>Face / HUD</td><td colspan="2">HTML page served by FastAPI, or Electron/Tauri app</td><td>FastAPI + browser</td></tr>
+      <tr><td>Voice framework</td><td colspan="2">Pipecat or LiveKit Agents (open source) if you outgrow your own loop</td><td>Build your own first</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><b>Recommended hybrid</b><p class="small">Run ears, mouth and memory locally (fast, private, free forever). Use the free Gemini or Groq tier as the brain for hard questions, and fall back to a local Ollama model when you are offline or hit the daily limit. Keep private data such as passwords and documents on the local model only, since free cloud tiers may use your prompts for training.</p></div>
+</section>
+
+<section>
+  <span class="eyebrow">Hardware</span>
+  <h2>What your PC decides</h2>
+  <p>You do not need to buy anything to start. Check what you have: open Task Manager → Performance and note your RAM and GPU memory.</p>
+  <div class="tiers">
+    <div class="tier"><span class="eyebrow" style="color:var(--muted)">Tier A</span><h3>Laptop, no GPU</h3><span class="spec">8–16 GB RAM · CPU only</span><ul><li>Wake word, Whisper <code>base</code>/<code>small</code>, Kokoro or Piper: fine</li><li>Brain: use the free cloud tier</li><li>Local models of 1–4B params work but are slow and simple</li></ul></div>
+    <div class="tier"><span class="eyebrow" style="color:var(--muted)">Tier B</span><h3>Gaming PC</h3><span class="spec">NVIDIA GPU, 6–8 GB VRAM</span><ul><li>Everything in Tier A, faster</li><li>7–8B models locally at usable speed</li><li>Fully offline Jarvis becomes realistic</li></ul></div>
+    <div class="tier"><span class="eyebrow" style="color:var(--muted)">Tier C</span><h3>Workstation</h3><span class="spec">12–24 GB VRAM</span><ul><li>14–32B models locally, much smarter</li><li>Sub-second transcription</li><li>Local vision at good speed</li></ul></div>
+  </div>
+  <p class="muted small">Windows 10 stopped getting regular security updates in October 2025. Everything here still runs on it, but an assistant that controls your PC is safer on a supported system (Windows 11 or Linux) in the long run.</p>
+</section>
+
+<section>
+  <span class="eyebrow">How it will look</span>
+  <h2>The Jarvis HUD, on a normal screen</h2>
+  <p>This is the realistic version of the movie interface: a browser window that pulses while listening, shows what you said, what Jarvis did, and your system status. Built with plain HTML, CSS and a WebSocket to your Python program.</p>
+  <div class="hud" aria-label="Mockup of the Jarvis interface">
+    <div class="panel">
+      <h4>Conversation</h4>
+      <div class="line you">you › hey jarvis, what’s the weather tomorrow and remind me to call mum at six</div>
+      <div class="line jv">jarvis › Tomorrow in Nairobi: 24°, light rain after 3 pm. I’ve set a reminder for 6:00 pm to call your mother.</div>
+      <div class="line you">you › open vs code and my latest project</div>
+      <div class="line jv">jarvis › Opening it now, sir.</div>
+    </div>
+    <div class="orbbox">
+      <div class="orb" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></div>
+      <div class="status">LISTENING</div>
+    </div>
+    <div class="panel">
+      <h4>Tool log</h4>
+      <div class="line ok">✓ get_weather(city="Nairobi")</div>
+      <div class="line ok">✓ add_reminder("Call mum", 18:00)</div>
+      <div class="line ok">✓ open_app("code", path="…/projects")</div>
+      <h4 style="margin-top:8px">System</h4>
+      <div class="stat"><span>CPU</span><span>23%</span></div>
+      <div class="stat"><span>RAM</span><span>9.1 / 16 GB</span></div>
+      <div class="stat"><span>Brain</span><span>gemini · free</span></div>
+      <div class="stat"><span>Reply time</span><span>1.4 s</span></div>
+    </div>
+  </div>
+  <p class="muted small">Mockup with example content. Weather, times and paths are illustrative.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Implementation plan</span>
+  <h2>Ten phases, about ten weeks part-time</h2>
+  <p>Each phase ends with something that works. Do them in order: each one builds on the last, and you can stop at any phase and still have a useful assistant.</p>
+  <ol class="phases">
+    <li class="phase"><span class="when">Day 1–2</span><div class="body"><span class="num">PHASE 0 · WORKSHOP</span><h3>Set up your tools</h3><p>Install Python 3.11, Git, VS Code and Ollama. Make a project folder with a virtual environment. Get a free Gemini API key from Google AI Studio and store it in a <code>.env</code> file, never in your code.</p><div class="done"><b>Done when</b> <code>ollama run</code> answers a question and a 5-line Python script gets a reply from Gemini.</div></div></li>
+    <li class="phase"><span class="when">Week 1</span><div class="body"><span class="num">PHASE 1 · BRAIN</span><h3>Text Jarvis in the terminal</h3><p>A chat loop with a system prompt that gives it the personality: polite, dry British wit, short answers. Keep conversation history so it follows context. Add automatic fallback from Gemini to Ollama when offline.</p><span class="tools">google-genai · ollama · python-dotenv</span><div class="done"><b>Done when</b> you can hold a 10-message conversation and it remembers what you said earlier.</div></div></li>
+    <li class="phase"><span class="when">Week 2</span><div class="body"><span class="num">PHASE 2 · EARS AND VOICE</span><h3>Push-to-talk conversation</h3><p>Hold a key, speak, release. Record with <code>sounddevice</code>, transcribe with faster-whisper, reply through Kokoro. Choose a British voice. Stream the voice sentence by sentence so it starts speaking before the full answer is ready.</p><span class="tools">sounddevice · faster-whisper · kokoro</span><div class="done"><b>Done when</b> a spoken question gets a spoken answer in under about 3 seconds.</div></div></li>
+    <li class="phase"><span class="when">Week 3</span><div class="body"><span class="num">PHASE 3 · ALWAYS LISTENING</span><h3>“Hey Jarvis” and interruptions</h3><p>Replace push-to-talk with openWakeWord’s <code>hey_jarvis</code> model. Use Silero VAD to tell when you stop talking. Let a second “Jarvis” cut it off mid-sentence. Play a short chime when it wakes.</p><span class="tools">openwakeword · silero-vad</span><div class="done"><b>Done when</b> it wakes reliably from across the room and ignores the TV most of the time.</div></div></li>
+    <li class="phase"><span class="when">Weeks 4–5</span><div class="body"><span class="num">PHASE 4 · HANDS</span><h3>Tools: make it do things</h3><p>Write small Python functions and register them for tool calling: time and date, weather (Open-Meteo), web search (DuckDuckGo), open apps and folders, volume, timers and reminders, system stats, play music, take a screenshot. Add a “confirm first” rule for anything that deletes, sends or spends.</p><span class="tools">ddgs · requests · psutil · pyautogui · subprocess</span><div class="done"><b>Done when</b> “Open Chrome and search for flights to Mombasa” works by voice.</div></div></li>
+    <li class="phase"><span class="when">Week 6</span><div class="body"><span class="num">PHASE 5 · MEMORY</span><h3>It knows who you are</h3><p>A <code>remember</code> tool writes facts to SQLite (“my sister is called Amina”). Save conversation summaries into Chroma and look up relevant ones before each answer. Load your profile into the system prompt at startup.</p><span class="tools">sqlite3 · chromadb</span><div class="done"><b>Done when</b> you restart it and it still knows your name, preferences and yesterday’s reminders.</div></div></li>
+    <li class="phase"><span class="when">Week 7</span><div class="body"><span class="num">PHASE 6 · EYES</span><h3>Camera and screen vision</h3><p>A <code>look</code> tool grabs a webcam frame or a screenshot and sends it to a vision model. Ask “what am I holding?” or “what’s this error on my screen?”.</p><span class="tools">opencv-python · mss · Gemini vision or Ollama gemma3</span><div class="done"><b>Done when</b> it correctly describes an error message on your screen and suggests a fix.</div></div></li>
+    <li class="phase"><span class="when">Week 8</span><div class="body"><span class="num">PHASE 7 · REACH</span><h3>Phone access and smart home</h3><p>A Telegram bot that forwards your texts and voice notes to the same brain, so you can use Jarvis away from home. Optionally connect Home Assistant if you buy smart plugs or bulbs later.</p><span class="tools">python-telegram-bot · Home Assistant REST API</span><div class="done"><b>Done when</b> you text “what’s on my reminders?” from your phone and get an answer.</div></div></li>
+    <li class="phase"><span class="when">Week 9</span><div class="body"><span class="num">PHASE 8 · FACE</span><h3>The HUD</h3><p>A FastAPI server pushes events over a WebSocket to a full-screen browser page: the glowing orb reacts to audio, plus transcript, tool log and system stats like the mockup above. Later, wrap it in Electron or Tauri as a desktop app that starts with Windows.</p><span class="tools">fastapi · websockets · HTML/CSS/Canvas</span><div class="done"><b>Done when</b> the orb pulses while you talk and the tool log fills in live.</div></div></li>
+    <li class="phase"><span class="when">Week 10</span><div class="body"><span class="num">PHASE 9 · INITIATIVE</span><h3>It speaks first</h3><p>A scheduler runs jobs on its own: morning briefing (weather, reminders, news headlines), “you’ve been coding for 3 hours” nudges, battery or disk warnings. This is what makes it feel like Jarvis rather than a chatbot.</p><span class="tools">APScheduler</span><div class="done"><b>Done when</b> it greets you at 7 am with your day without being asked.</div></div></li>
+  </ol>
+</section>
+
+<section>
+  <span class="eyebrow">Ground rules</span>
+  <h2>Keep it safe while it grows</h2>
+  <ul class="plain">
+    <li>Never let it run shell commands the model writes freely. Give it named tools with fixed behaviour instead.</li>
+    <li>Ask out loud before deleting files, sending messages or spending money, and log every tool call.</li>
+    <li>Keep API keys in <code>.env</code> and add that file to <code>.gitignore</code> before your first push to GitHub.</li>
+    <li>Route anything private (documents, passwords, health) to the local model only.</li>
+    <li>Free tier limits change often. Check each provider’s rate-limit page and build the Ollama fallback early.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="eyebrow">Sources</span>
+  <h2>Research notes</h2>
+  <p class="muted small">Gathered by web search on 20 Oct 2026. Several sources are blogs or vendor pages; speed and rate-limit figures vary between them and should be checked on your own hardware and on each provider’s current pages.</p>
+  <ul class="sources">
+    <li><a href="https://www.kunalganglani.com/blog/local-ai-voice-assistant-whisper-piper-ollama" target="_blank" rel="noopener">Local AI voice assistant stack: Whisper + Piper + Ollama</a></li>
+    <li><a href="https://www.popularai.org/p/local-alexa-alternative-home-assistant-ollama" target="_blank" rel="noopener">Local Alexa alternative with Home Assistant and Ollama</a></li>
+    <li><a href="https://www.hackster.io/HanzoHuang/make-home-assistant-voice-fully-local-with-rk3576-50b4de" target="_blank" rel="noopener">Fully local Home Assistant voice on an RK3576 board</a></li>
+    <li><a href="https://ae.linkedin.com/in/aabaza" target="_blank" rel="noopener">A developer’s local GPU J.A.R.V.I.S. (Parakeet STT)</a></li>
+    <li><a href="https://pypi.org/project/OpenJarvis/1.0.3.dev736/" target="_blank" rel="noopener">OpenJarvis local-first framework (PyPI)</a></li>
+    <li><a href="https://github.com/Mano11x/JARVIS" target="_blank" rel="noopener">JARVIS: Django + Ollama self-hosted project</a></li>
+    <li><a href="https://www.everydev.ai/p/post-build-a-local-python-windows-ai-assistant-jarvis" target="_blank" rel="noopener">Building a local Python Windows assistant</a></li>
+    <li><a href="https://pypi.org/p/pipecat-ai" target="_blank" rel="noopener">Pipecat voice agent framework</a></li>
+    <li><a href="https://github.com/livekit/agents" target="_blank" rel="noopener">LiveKit Agents</a></li>
+    <li><a href="https://localai.io/blog/parakeet-cpp-asr-on-cpu/" target="_blank" rel="noopener">parakeet.cpp vs whisper.cpp on CPU</a></li>
+    <li><a href="https://openwhispr.com/blog/parakeet-vs-whisper-vs-nemotron" target="_blank" rel="noopener">Parakeet vs Whisper vs Nemotron</a></li>
+    <li><a href="https://sachachua.com/blog/2026/01/emacs-and-whisper-el-trying-out-different-speech-to-text-backends-and-models/" target="_blank" rel="noopener">CPU speech-to-text backend comparison</a></li>
+    <li><a href="https://tts.ai/text-to-speech/?lang=es" target="_blank" rel="noopener">Kokoro and Piper model notes (tts.ai)</a></li>
+    <li><a href="https://fungies.io/how-to-run-local-llms-guide-2026/" target="_blank" rel="noopener">Running local LLMs in 2026</a></li>
+    <li><a href="https://dupple.com/learn/best-free-local-llm-tools" target="_blank" rel="noopener">Best free local LLM tools 2026</a></li>
+    <li><a href="https://openrouter.ai/blog/tutorials/free-llm-apis-compared/" target="_blank" rel="noopener">OpenRouter: free LLM APIs compared</a></li>
+    <li><a href="https://wetheflywheel.com/en/ai-model-access/free-llm-api-tiers-2026/" target="_blank" rel="noopener">Free LLM API tiers 2026</a></li>
+    <li><a href="https://costbench.com/best/best-llm-api-with-free-tier/" target="_blank" rel="noopener">Gemini, Groq, OpenRouter free tiers ranked</a></li>
+    <li><a href="https://www.promptquorum.com/power-local-llm/local-ai-agents-with-mcp-2026" target="_blank" rel="noopener">Local AI agents with MCP</a></li>
+    <li><a href="https://fungies.io/mcp-servers-guide-2026-model-context-protocol/" target="_blank" rel="noopener">MCP servers guide 2026</a></li>
+    <li><a href="https://techgenyz.com/holographic-displays-progress-roadblocks/" target="_blank" rel="noopener">Holographic displays: progress and roadblocks</a></li>
+    <li><a href="https://newelectronics.co.uk/content/news/holographic-prototype-enables-mid-air-displays" target="_blank" rel="noopener">Mid-air holographic prototype limits</a></li>
+    <li><a href="https://metavert.io/compare/digital-hologram-vs-volumetric-video" target="_blank" rel="noopener">Digital hologram vs volumetric video</a></li>
+  </ul>
+</section>
+
+<footer>Project Jarvis Blueprint · feasibility and build plan · October 2026</footer>
+</div>
