@@ -88,7 +88,7 @@ http://127.0.0.1:5050
 ```
 - **Concentric Aperture Rings**: CSS/SVG rotating rings pulse dynamically to indicate Idle (breathing slate), Listening (emerald mic pulse), Thinking (amber orbital spin), and Speaking (cyan amplitude bloom).
 - **Live Sentence Captions**: Displays the exact text spoken by Jarvis in real-time.
-- **Permanent In-Repo Guide**: See [`docs/VISUALIZER-WALKTHROUGH.md`](file:///c:/Users/user%20pc/Desktop/2026/J.A.R.V.I.S/docs/VISUALIZER-WALKTHROUGH.md) for full architecture and verification screenshots.
+- **Permanent In-Repo Guide**: See [`docs/VISUALIZER-WALKTHROUGH.md`](docs/VISUALIZER-WALKTHROUGH.md) for full architecture and verification screenshots.
 - To run voice mode without opening the browser: `voice.bat --no-visual` or set `JARVIS_VISUAL=0` in `.env`.
 
 **Path length:** Windows refuses files with very long paths unless long-path support is turned on. Keep this folder somewhere short, like `Desktop\2026\Jarvis`, or the voice packages won't install.
