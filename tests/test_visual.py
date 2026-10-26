@@ -183,3 +183,38 @@ def test_respond_with_visual() -> None:
     statuses = [s for s, _ in visual.history]
     assert "speaking" in statuses
     assert visual.history[-1] == ("idle", "")
+
+
+def test_abrupt_client_disconnect() -> None:
+    """Verify that when a client abruptly closes an SSE socket, the server survives cleanly."""
+    import socket
+    import struct
+    import time
+
+    server = VisualServer(port=find_free_port(5300), auto_open=False)
+    url = server.start()
+    try:
+        # Open raw socket and send GET /events
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("127.0.0.1", server.port))
+        s.sendall(b"GET /events HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        # Read the initial response
+        data = s.recv(256)
+        assert b"text/event-stream" in data
+
+        # Force abrupt close on client side (RST/Abort)
+        if hasattr(socket, "SO_LINGER"):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        s.close()
+
+        # Trigger broadcasts to dead connection
+        server.set_state("speaking", "Test speaking after client disconnected")
+        server.set_state("idle")
+        time.sleep(0.1)
+
+        # Server should still be healthy and serve requests
+        with urllib.request.urlopen(f"{url}/api/state") as resp:
+            assert resp.status == 200
+    finally:
+        server.stop()
+

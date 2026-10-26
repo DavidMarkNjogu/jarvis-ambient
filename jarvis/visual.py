@@ -97,33 +97,42 @@ class VisualHandler(BaseHTTPRequestHandler):
         # Suppress noisy standard HTTP access logs in console
         pass
 
+    def handle_one_request(self) -> None:
+        try:
+            super().handle_one_request()
+        except (ConnectionError, OSError):
+            self.close_connection = True
+
     def do_GET(self) -> None:
-        path = self.path.split("?")[0].rstrip("/")
-        if path in {"", "/index.html"}:
-            self._serve_file(STATIC_DIR / "visualizer.html", "text/html; charset=utf-8")
-        elif path == "/visualizer.css":
-            self._serve_file(STATIC_DIR / "visualizer.css", "text/css; charset=utf-8")
-        elif path == "/visualizer.js":
-            self._serve_file(STATIC_DIR / "visualizer.js", "application/javascript; charset=utf-8")
-        elif path == "/api/state":
-            body = json.dumps(self.broadcaster.current_state).encode("utf-8")
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Connection", "close")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(body)
+        try:
+            path = self.path.split("?")[0].rstrip("/")
+            if path in {"", "/index.html"}:
+                self._serve_file(STATIC_DIR / "visualizer.html", "text/html; charset=utf-8")
+            elif path == "/visualizer.css":
+                self._serve_file(STATIC_DIR / "visualizer.css", "text/css; charset=utf-8")
+            elif path == "/visualizer.js":
+                self._serve_file(STATIC_DIR / "visualizer.js", "application/javascript; charset=utf-8")
+            elif path == "/api/state":
+                body = json.dumps(self.broadcaster.current_state).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+                self.close_connection = True
+            elif path == "/favicon.ico":
+                self.send_response(HTTPStatus.NO_CONTENT)
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.close_connection = True
+            elif path == "/events":
+                self._handle_sse()
+            else:
+                self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+        except (ConnectionError, OSError):
             self.close_connection = True
-        elif path == "/favicon.ico":
-            self.send_response(HTTPStatus.NO_CONTENT)
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.close_connection = True
-        elif path == "/events":
-            self._handle_sse()
-        else:
-            self.send_error(HTTPStatus.NOT_FOUND, "File not found")
 
     def _serve_file(self, file_path: Path, content_type: str) -> None:
         if not file_path.is_file():
@@ -140,12 +149,15 @@ class VisualHandler(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def _handle_sse(self) -> None:
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
+        try:
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+        except (ConnectionError, OSError):
+            return
 
         client_queue = self.broadcaster.subscribe()
         try:
@@ -160,7 +172,7 @@ class VisualHandler(BaseHTTPRequestHandler):
                     # Keep-alive heartbeat
                     self.wfile.write(b": ping\n\n")
                     self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError):
+        except (ConnectionError, OSError):
             pass
         finally:
             self.broadcaster.unsubscribe(client_queue)
@@ -177,6 +189,20 @@ def find_free_port(start_port: int = 5050, max_attempts: int = 20) -> int:
     return start_port
 
 
+class SilentThreadingHTTPServer(ThreadingHTTPServer):
+    """Threading HTTPServer that suppresses noisy tracebacks when clients close browser tabs."""
+
+    daemon_threads = True
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        import sys
+
+        _, exc, _ = sys.exc_info()
+        if isinstance(exc, (ConnectionError, OSError)):
+            return
+        super().handle_error(request, client_address)
+
+
 class VisualServer:
     """Manages the background visual HTTP/SSE server."""
 
@@ -184,7 +210,7 @@ class VisualServer:
         self.broadcaster = VisualBroadcaster()
         self.port = find_free_port(port)
         self.auto_open = auto_open
-        self._server: ThreadingHTTPServer | None = None
+        self._server: SilentThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
     def start(self) -> str:
@@ -193,8 +219,7 @@ class VisualServer:
             (VisualHandler,),
             {"broadcaster": self.broadcaster},
         )
-        self._server = ThreadingHTTPServer(("127.0.0.1", self.port), handler_class)
-        self._server.daemon_threads = True
+        self._server = SilentThreadingHTTPServer(("127.0.0.1", self.port), handler_class)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
         url = f"http://127.0.0.1:{self.port}"
