@@ -80,4 +80,15 @@ Optional natural voice: `.venv\Scripts\python -m pip install -r requirements-off
 
 Override in `.env` with `JARVIS_STT=groq|local`, `JARVIS_TTS=kokoro|windows`, `WHISPER_MODEL`, `KOKORO_VOICE`, `WINDOWS_VOICE`.
 
+## Reactive Speaking Visualizer (`voice.bat`)
+
+Double-clicking `voice.bat` now automatically boots a zero-dependency local visualizer at:
+```
+http://127.0.0.1:5050
+```
+- **Concentric Aperture Rings**: CSS/SVG rotating rings pulse dynamically to indicate Idle (breathing slate), Listening (emerald mic pulse), Thinking (amber orbital spin), and Speaking (cyan amplitude bloom).
+- **Live Sentence Captions**: Displays the exact text spoken by Jarvis in real-time.
+- **Permanent In-Repo Guide**: See [`docs/VISUALIZER-WALKTHROUGH.md`](file:///c:/Users/user%20pc/Desktop/2026/J.A.R.V.I.S/docs/VISUALIZER-WALKTHROUGH.md) for full architecture and verification screenshots.
+- To run voice mode without opening the browser: `voice.bat --no-visual` or set `JARVIS_VISUAL=0` in `.env`.
+
 **Path length:** Windows refuses files with very long paths unless long-path support is turned on. Keep this folder somewhere short, like `Desktop\2026\Jarvis`, or the voice packages won't install.

@@ -16,8 +16,8 @@ Open File Explorer, go to **Desktop → 2026 → J.A.R.V.I.S**. Everything Jarvi
 
 | Double-click | What happens |
 |---|---|
-| `voice.bat` | **Talking Jarvis.** A black window opens. Press **Enter**, speak, then pause. Jarvis answers out loud. You can type instead of speaking. Type `q` and press Enter to quit. The first start takes about 1½ minutes while the speech model loads. |
-| `jarvis.bat` | **Typing-only Jarvis.** Faster to start. Type a question, press Enter, and read the answer. Type `/quit` to exit. |
+| `voice.bat` | **Talking Jarvis + Visualizer.** A black window opens, and your web browser automatically opens the glowing visual aperture at `http://127.0.0.1:5050`. Press **Enter**, speak, then pause. Jarvis answers out loud while the orb pulses in arc-cyan with live subtitles. You can type instead of speaking. Type `q` and press Enter to quit. The first start takes about 1½ minutes while the speech model loads. |
+| `jarvis.bat` | **Typing-only Jarvis.** Faster to start. Type a question, press Enter, and read the answer in the terminal. Type `/quit` to exit. |
 | `setup.bat` | Changes or adds your API key, or your name. Copy a key first, then run this. |
 
 Inside `jarvis.bat` you can also type:
@@ -37,14 +37,17 @@ Inside `jarvis.bat` you can also type:
 |---|---|---|
 | `voice.bat`, `jarvis.bat`, `setup.bat` | The buttons you double-click | Use them |
 | `START-HERE.md` | This guide | Read it |
+| `docs\VISUALIZER-WALKTHROUGH.md` | Complete visualizer guide, screenshots & navigation | Read it |
 | `README.md` | The technical guide: settings, models, voices | When changing settings |
 | `jarvis-blueprint.html` | The full plan for every phase. Open it in a browser. | Read it |
 | `PHASE3-PLAN.md` | The plan for the next phase ("Hey Jarvis"), waiting for your OK | Read it |
 | `.env` | **Your secret API key** and your name | Never share or upload it |
 | `.env.example` | A blank copy of `.env` showing every setting | Reference |
 | `jarvis\` | The program itself (Python code) | Only to change how it works |
+| `jarvis\static\` | The visualizer aperture frontend (HTML, CSS, JS) | Safe to inspect |
 | `jarvis\personality.py` | How Jarvis talks. Edit this to change its personality. | Safe to edit |
 | `tests\` | Automatic checks that the code still works | Leave alone |
+| `docs\` | Project documentation and verification screenshots | Reference |
 | `.venv\` | Python and all the installed packages (about 300 MB) | Leave alone; rebuild if broken (step 5) |
 | `requirements*.txt` | Lists of packages to install | Used when rebuilding |
 | `history\` | An old copy of the project and the original chat transcript | Safe to delete if you need space |
@@ -107,7 +110,7 @@ In a `cmd` window in this folder (see step 5):
 .venv\Scripts\python -m pytest -q
 ```
 
-It should end with "53 passed" (the number grows as phases are added).
+It should end with "61 passed" (the number grows as phases are added).
 
 ## 7. Progress
 
@@ -115,7 +118,8 @@ It should end with "53 passed" (the number grows as phases are added).
 |---|---|---|
 | 1 | Text brain (`jarvis.bat`) | Done |
 | 2 | Talking and listening (`voice.bat`) | Done |
+| 2+ | Reactive speaking visualizer (`http://127.0.0.1:5050`) | Done (see `docs\VISUALIZER-WALKTHROUGH.md`) |
 | 3 | "Hey Jarvis" wake word | Planned: `PHASE3-PLAN.md` |
-| 4+ | Actions, memory, HUD… | See `jarvis-blueprint.html` |
+| 4+ | Actions, memory, full HUD… | See `jarvis-blueprint.html` |
 
 When a phase is finished, this file gets updated.
