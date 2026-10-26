@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
 
     brain = Brain(
         [Provider(cfg) for cfg in settings.providers],
-        system_prompt=lambda: system_prompt(settings.user_name),
+        system_prompt=lambda: system_prompt(settings.user_name, mode="voice"),
         history_turns=settings.history_turns,
         on_failure=lambda err: console.print(f"[dim]  ✗ {err.provider}: {err.reason}[/dim]"),
     )
