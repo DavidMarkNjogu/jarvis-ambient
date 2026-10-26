@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J.A.R.V.I.S. Aperture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/visualizer.css">
+</head>
+<body class="state-idle">
+  <div class="aperture-container">
+    <header class="telemetry-bar">
+      <span class="system-id">J.A.R.V.I.S.</span>
+      <span class="status-indicator" id="statusText">SYSTEM IDLE</span>
+    </header>
+
+    <main class="orb-stage" aria-label="Visual speech aperture">
+      <div class="orb-wrapper" id="orbWrapper">
+        <span class="ring r-outer"></span>
+        <span class="ring r-mid"></span>
+        <span class="ring r-inner"></span>
+        <span class="ring core"></span>
+      </div>
+    </main>
+
+    <footer class="caption-dock">
+      <div class="caption-label">STREAM TELEMETRY</div>
+      <div class="caption-content" id="captionText">Awaiting command input...</div>
+    </footer>
+  </div>
+
+  <script src="/visualizer.js"></script>
+</body>
+</html>
