@@ -16,20 +16,23 @@ Open File Explorer, go to **Desktop → 2026 → J.A.R.V.I.S**. Everything Jarvi
 
 | Double-click | What happens |
 |---|---|
-| `voice.bat` | **Talking Jarvis + Visualizer.** A black window opens, and your web browser automatically opens the glowing visual aperture at `http://127.0.0.1:5050`. Press **Enter**, speak, then pause. Jarvis answers out loud while the orb pulses in arc-cyan with live subtitles. You can type instead of speaking. Type `q` and press Enter to quit. The first start takes about 1½ minutes while the speech model loads. |
+| `voice.bat` | **Talking Jarvis + Visualizer (Hands-Free Wake Word).** A black window opens, and your web browser opens the glowing visual aperture at `http://127.0.0.1:5050`. Say **"Hey Jarvis"**, hear a chime, ask your question, and hear the answer spoken aloud while the orb pulses in arc-cyan. You can also type commands like `/speed <rate>`, `/voices`, `/voice <name>`, or `/reset`. Type `q` to quit. If you prefer press-Enter mode, run `voice.bat --push-to-talk`. |
 | `jarvis.bat` | **Typing-only Jarvis.** Faster to start. Type a question, press Enter, and read the answer in the terminal. Type `/quit` to exit. |
 | `setup.bat` | Changes or adds your API key, or your name. Copy a key first, then run this. |
 
-Inside `jarvis.bat` you can also type:
+Inside `jarvis.bat` and `voice.bat` you can also type:
 
 | Command | What it does |
 |---|---|
+| `/speed <val>` | Change speech speed (e.g. `/speed 1.2` for faster speech) |
+| `/voices` | List installed Windows and Kokoro voices |
+| `/voice <name>` | Switch active voice (e.g. `/voice George` or `/voice bm_lewis`) |
 | `/reset` | Forget the conversation so far |
 | `/brain` | Show which AI brains are in use |
 | `/models` | List the models each brain offers |
 | `/quit` | Exit |
 
-"Hey Jarvis" doesn't work yet. That's Phase 3 (see `PHASE3-PLAN.md`).
+"Hey Jarvis" wake word is active in `voice.bat` (Phase 3). Press-Enter fallback is available if the wake model fails.
 
 ## 3. What's in the folder
 

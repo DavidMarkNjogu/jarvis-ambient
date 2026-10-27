@@ -2,7 +2,7 @@
 
 A personal assistant built one phase at a time, following the Project Jarvis Blueprint.
 
-**Current stage: Phase 1, the text brain.** You type, and Jarvis answers in character. It remembers the conversation while it's running and switches to a backup brain automatically if one is rate-limited or offline. It can't take actions yet. Voice comes in Phase 2.
+**Current stage: Phase 3, "Hey Jarvis" Wake Word & Voice Customization.** Double-click `voice.bat` to launch hands-free voice mode with the browser speaking aperture at `http://127.0.0.1:5050`. Say "Hey Jarvis", hear the chime, speak your query, and hear the answer spoken aloud. Type `/speed <rate>` to adjust voice speed, `/voices` to list voices, and `/voice <name>` to switch. Enter-only push-to-talk mode is available via `voice.bat --push-to-talk`.
 
 ## Finish setup (5 minutes, free)
 
