@@ -113,7 +113,49 @@ def check_e2e() -> int:
                            f"(limit {E2E_MAX_SECONDS:.0f}s); reply {reply[:60]!r}")
 
 
-CHECKS = {"brain": check_brain, "stt": check_stt, "tts": check_tts, "e2e": check_e2e}
+def check_wake() -> int:
+    import os
+    import numpy as np
+    from jarvis.stt import LocalWhisperTranscriber
+    from jarvis.wake import WakeDetector
+
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = Path(tmp) / "wake_phrase.wav"
+        make_wav(wav, "Hey Jarvis, what is the capital of Japan?")
+        with wave.open(str(wav)) as w:
+            raw = w.readframes(w.getnframes())
+            pcm = np.frombuffer(raw, dtype="<i2")
+
+        detector = WakeDetector(threshold=0.5, load_model=True)
+        woke = False
+        wake_frame = -1
+        frame_size = 1280
+        total_frames = len(pcm) // frame_size
+        remainder_frames = []
+
+        for i in range(total_frames):
+            frame = pcm[i * frame_size : (i + 1) * frame_size]
+            if not woke:
+                if detector.process_frame(frame):
+                    woke = True
+                    wake_frame = i
+            else:
+                remainder_frames.append(frame.astype("float32") / 32768.0)
+
+        if not remainder_frames:
+            return done("wake", False, f"woke={woke}, but no audio frames remained for question")
+
+        question_audio = np.concatenate(remainder_frames)
+        ears = LocalWhisperTranscriber(os.environ.get("WHISPER_MODEL") or "base.en")
+        started = time.perf_counter()
+        heard = ears.transcribe(question_audio)
+        took = time.perf_counter() - started
+
+        ok = woke and "japan" in heard.lower()
+        return done("wake", ok, f"woke={woke} (frame {wake_frame}/{total_frames}); heard {heard!r} in {took:.1f}s")
+
+
+CHECKS = {"brain": check_brain, "stt": check_stt, "tts": check_tts, "e2e": check_e2e, "wake": check_wake}
 
 
 def main() -> int:
