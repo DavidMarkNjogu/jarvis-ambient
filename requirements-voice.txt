@@ -3,5 +3,8 @@ numpy>=1.26
 sounddevice>=0.4.6
 comtypes>=1.2
 
+# Phase 3: wake word detection
+openwakeword>=0.6.0
+
 # Optional, fully offline speech recognition and the natural Kokoro voice.
 # Install with:  .venv\Scripts\python -m pip install -r requirements-offline.txt
