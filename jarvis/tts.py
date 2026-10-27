@@ -22,50 +22,136 @@ class Voice(Protocol):
 
     def stop(self) -> None: ...
 
+    def set_speed(self, speed: float) -> None: ...
+
+    def set_voice(self, name: str) -> None: ...
+
+
+def _speed_to_sapi_rate(speed: float) -> int:
+    """Map speed multiplier (e.g. 1.0x -> 0, 1.5x -> 5) to SAPI Rate bounds (-10 to +10, clamped)."""
+    rate = int(round((speed - 1.0) * 10.0))
+    return max(-10, min(10, rate))
+
 
 class KokoroVoice:
-    def __init__(self, voice: str = "bm_george", speed: float = 1.05,
-                 model: Path = KOKORO_MODEL, voices: Path = KOKORO_VOICES):
-        from kokoro_onnx import Kokoro
-
+    def __init__(
+        self,
+        voice: str = "bm_george",
+        speed: float = 1.05,
+        model: Path = KOKORO_MODEL,
+        voices: Path = KOKORO_VOICES,
+        kokoro_factory: Callable[[str, str], Any] | None = None,
+        play_audio: bool = True,
+    ):
         self.label = f"kokoro {voice}"
         self._voice = voice
         self._speed = speed
+        self._play_audio = play_audio
         self._lang = "en-gb" if voice.startswith("b") else "en-us"
-        self._kokoro = Kokoro(str(model), str(voices))
+        if kokoro_factory is not None:
+            self._kokoro = kokoro_factory(str(model), str(voices))
+        else:
+            from kokoro_onnx import Kokoro
+            self._kokoro = Kokoro(str(model), str(voices))
+
+    def set_speed(self, speed: float) -> None:
+        self._speed = speed
+
+    def set_voice(self, voice: str) -> None:
+        self._voice = voice
+        self._lang = "en-gb" if voice.startswith("b") else "en-us"
+        self.label = f"kokoro {voice}"
 
     def speak(self, text: str) -> None:
-        import sounddevice as sd
-
         samples, sample_rate = self._kokoro.create(text, voice=self._voice, speed=self._speed, lang=self._lang)
-        sd.play(samples, sample_rate)
-        sd.wait()
+        if self._play_audio:
+            import sounddevice as sd
+            sd.play(samples, sample_rate)
+            sd.wait()
 
     def stop(self) -> None:
-        import sounddevice as sd
-
-        sd.stop()
+        if self._play_audio:
+            import sounddevice as sd
+            sd.stop()
 
 
 class WindowsVoice:
     """Uses the speech voices that come with Windows. No download needed."""
 
-    def __init__(self, prefer: str = "George"):
-        import comtypes.client
+    def __init__(
+        self,
+        prefer: str = "George",
+        speed: float = 1.0,
+        sapi_factory: Callable[[], Any] | None = None,
+    ):
+        if sapi_factory is not None:
+            self._sapi = sapi_factory()
+        else:
+            import comtypes.client
+            self._sapi = comtypes.client.CreateObject("SAPI.SpVoice")
 
-        self._sapi = comtypes.client.CreateObject("SAPI.SpVoice")
-        voices = _windows_voices(self._sapi)
-        chosen = next((v for v, d in voices if prefer and prefer.lower() in d.lower()), None)
-        chosen = chosen or next((v for v, d in voices if _is_british(d)), None)
+        self._voices = _windows_voices(self._sapi)
+        self.label = "windows"
+        self.set_voice(prefer)
+        self.set_speed(speed)
+
+    def set_speed(self, speed: float) -> None:
+        self._speed = speed
+        self._sapi.Rate = _speed_to_sapi_rate(speed)
+
+    def set_voice(self, name: str) -> None:
+        chosen = next((v for v, d in self._voices if name and name.lower() in d.lower()), None)
+        chosen = chosen or next((v for v, d in self._voices if _is_british(d)), None)
         if chosen is not None:
             self._sapi.Voice = chosen
-        self.label = f"windows {self._sapi.Voice.GetDescription()}"
+            self.label = f"windows {chosen.GetDescription()}"
+        else:
+            try:
+                self.label = f"windows {self._sapi.Voice.GetDescription()}"
+            except Exception:
+                self.label = "windows"
 
     def speak(self, text: str) -> None:
         self._sapi.Speak(text)
 
     def stop(self) -> None:
         self._sapi.Speak("", 2)  # SVSFPurgeBeforeSpeak
+
+
+def list_voices(
+    engine: str = "auto",
+    sapi_factory: Callable[[], Any] | None = None,
+) -> list[str]:
+    """List available voices for the specified or auto-detected engine."""
+    results: list[str] = []
+    if engine in {"windows", "auto"}:
+        try:
+            if sapi_factory is not None:
+                sapi = sapi_factory()
+            else:
+                import comtypes.client
+                sapi = comtypes.client.CreateObject("SAPI.SpVoice")
+            tokens = _windows_voices(sapi)
+            for _, desc in tokens:
+                if desc not in results:
+                    results.append(desc)
+        except Exception:
+            pass
+
+    if engine in {"kokoro", "auto"}:
+        kokoro_voices = [
+            "bm_george (British male)",
+            "bm_lewis (British male)",
+            "bf_emma (British female)",
+            "bf_isabella (British female)",
+            "am_adam (American male)",
+            "am_michael (American male)",
+            "af_bella (American female)",
+            "af_nicole (American female)",
+        ]
+        results.extend(kokoro_voices)
+
+    return results
 
 
 class Mouth:
