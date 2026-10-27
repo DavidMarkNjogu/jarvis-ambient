@@ -18,8 +18,9 @@ from .config import load_settings, voice_settings_from_env
 from .personality import system_prompt
 from .providers import Provider, ProviderError
 from .speech import SentenceBuffer
-from .tts import KOKORO_MODEL, KOKORO_VOICES, KokoroVoice, Mouth, WindowsVoice
+from .tts import KOKORO_MODEL, KOKORO_VOICES, KokoroVoice, Mouth, WindowsVoice, list_voices
 from .visual import VisualServer
+from .wake import make_chime
 
 
 def build_transcriber(vs, console: Console):
@@ -34,21 +35,37 @@ def build_transcriber(vs, console: Console):
 
 
 def build_mouth(vs) -> Mouth:
+    speed = getattr(vs, "voice_speed", 1.1)
     if vs.tts_engine == "kokoro":
-        return Mouth(lambda: KokoroVoice(vs.kokoro_voice))
-    return Mouth(lambda: WindowsVoice(vs.windows_voice))
+        return Mouth(lambda: KokoroVoice(vs.kokoro_voice, speed=speed))
+    return Mouth(lambda: WindowsVoice(vs.windows_voice, speed=speed))
 
 
-def main(argv: list[str] | None = None) -> int:
+def init_wake_detector(vs, console: Console | None = None):
+    if not getattr(vs, "wake_enabled", True):
+        return None
+    try:
+        from .wake import WakeDetector
+
+        threshold = getattr(vs, "wake_threshold", 0.5)
+        return WakeDetector(threshold=threshold, load_model=True)
+    except Exception as err:
+        if console:
+            console.print(f"[dim]wake word detector disabled ({err}); falling back to press-Enter mode.[/dim]")
+        return None
+
+
+def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
-    parser = argparse.ArgumentParser(prog="jarvis-voice", description="Talking Jarvis (Phase 2).")
+    parser = argparse.ArgumentParser(prog="jarvis-voice", description="Talking Jarvis (Phase 3).")
     parser.add_argument("--no-visual", action="store_true", help="run without browser visualizer")
     parser.add_argument("--port", type=int, default=5050, help="port for the visualizer server")
+    parser.add_argument("--push-to-talk", action="store_true", help="force press-Enter mode (skip wake word)")
     args = parser.parse_args(argv)
 
-    console = Console(highlight=False)
+    console = console or Console(highlight=False)
     try:
         settings = load_settings()
         kokoro_ready = KOKORO_MODEL.exists() and KOKORO_VOICES.exists()
@@ -67,6 +84,10 @@ def main(argv: list[str] | None = None) -> int:
         console.print(f"[red]Voice parts aren't installed:[/red] {err.name}. See README.md, Phase 2.")
         return 1
 
+    wake_detector = None
+    if not args.push_to_talk and getattr(vs, "wake_enabled", True):
+        wake_detector = init_wake_detector(vs, console)
+
     visual: VisualServer | None = None
     if not args.no_visual and os.environ.get("JARVIS_VISUAL", "1") != "0":
         try:
@@ -79,25 +100,70 @@ def main(argv: list[str] | None = None) -> int:
 
     brain = Brain(
         [Provider(cfg) for cfg in settings.providers],
-        system_prompt=lambda: system_prompt(settings.user_name, mode="voice"),
+        system_prompt=lambda: system_prompt(
+            settings.user_name,
+            mode="voice",
+            voice_name=mouth.label,
+        ),
         history_turns=settings.history_turns,
         on_failure=lambda err: console.print(f"[dim]  ✗ {err.provider}: {err.reason}[/dim]"),
     )
-    from .listen import record_utterance
+    from .listen import MicStream, record_utterance
 
-    console.print("[bold cyan]J.A.R.V.I.S.[/bold cyan] [dim]online · voice mode[/dim]")
+    mode_label = "hands-free 'Hey Jarvis'" if wake_detector else "press-Enter"
+    console.print(f"[bold cyan]J.A.R.V.I.S.[/bold cyan] [dim]online · voice mode ({mode_label})[/dim]")
     console.print(f"[dim]ears: {transcriber.label} · voice: {mouth.label} · brain: {settings.providers[0].name}[/dim]")
-    console.print("[dim]Press Enter and speak. Type a message to skip the mic. Type q to quit.[/dim]")
+    if wake_detector:
+        console.print("[dim]Say 'Hey Jarvis' to speak hands-free, or type a command (/speed, /voices, /voice, q).[/dim]")
+    else:
+        console.print("[dim]Press Enter and speak. Type a message to skip the mic. Type q to quit.[/dim]")
     greet(mouth, console, visual=visual)
+
+    mic_stream: MicStream | None = None
+    stream_iter = None
+    if wake_detector:
+        try:
+            mic_stream = MicStream()
+            stream_iter = iter(mic_stream)
+        except Exception as err:
+            console.print(f"[dim]Could not open continuous mic ({err}); falling back to press-Enter mode.[/dim]")
+            wake_detector = None
 
     try:
         while True:
             if visual:
                 visual.set_state("idle")
-            try:
-                typed = console.input("\n[bold]›[/bold] ").strip()
-            except (EOFError, KeyboardInterrupt):
-                break
+
+            typed = ""
+            heard_wake = False
+
+            if wake_detector and stream_iter is not None:
+                # Check for keyboard input on Windows without blocking
+                try:
+                    import msvcrt
+
+                    while True:
+                        if msvcrt.kbhit():
+                            typed = console.input("\n[bold]›[/bold] ").strip()
+                            break
+                        # Poll next frame from stream
+                        frame = next(stream_iter)
+                        if wake_detector.process_frame(frame):
+                            heard_wake = True
+                            break
+                except (ImportError, StopIteration):
+                    try:
+                        typed = console.input("\n[bold]›[/bold] ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        break
+                except (EOFError, KeyboardInterrupt):
+                    break
+            else:
+                try:
+                    typed = console.input("\n[bold]›[/bold] ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    break
+
             if typed.lower() in {"q", "quit", "exit", "/quit"}:
                 break
             if typed == "/reset":
@@ -105,15 +171,55 @@ def main(argv: list[str] | None = None) -> int:
                 console.print("[dim]Conversation forgotten.[/dim]")
                 continue
 
+            if typed.startswith("/speed"):
+                parts = typed.split()
+                if len(parts) > 1:
+                    try:
+                        new_speed = float(parts[1])
+                        mouth.set_speed(new_speed)
+                        console.print(f"[dim]Voice speed set to {new_speed}x.[/dim]")
+                    except ValueError:
+                        console.print("[dim]Usage: /speed <number between 0.5 and 2.5>[/dim]")
+                else:
+                    console.print(f"[dim]Current voice speed: {getattr(vs, 'voice_speed', 1.1)}x. Usage: /speed <number>[/dim]")
+                continue
+
+            if typed.startswith("/voices"):
+                voices = list_voices(vs.tts_engine)
+                console.print("[bold]Available voices:[/bold]")
+                for v in voices:
+                    console.print(f"  • {v}")
+                continue
+
+            if typed.startswith("/voice"):
+                parts = typed.split(maxsplit=1)
+                if len(parts) > 1:
+                    new_voice = parts[1].strip()
+                    mouth.set_voice(new_voice)
+                    console.print(f"[dim]Active voice switched to: {mouth.label}[/dim]")
+                else:
+                    console.print(f"[dim]Current voice: {mouth.label}. Usage: /voice <name>[/dim]")
+                continue
+
             text = typed
-            if not text:
+            if heard_wake or (not typed and not wake_detector):
+                if heard_wake:
+                    import sounddevice as sd
+
+                    sd.play(make_chime(), 16000)
+                    sd.wait()
+
                 if visual:
                     visual.set_state("listening", "Listening...")
                 with console.status("[bold green]listening…[/bold green] [dim](pause to finish)[/dim]"):
-                    audio = record_utterance()
+                    audio = record_utterance(stream=stream_iter if heard_wake else None)
                 if audio is None:
                     console.print("[dim]I didn't hear anything.[/dim]")
                     continue
+
+                if wake_detector:
+                    wake_detector.pause()
+
                 started = time.perf_counter()
                 try:
                     if visual:
@@ -122,9 +228,14 @@ def main(argv: list[str] | None = None) -> int:
                         text = transcriber.transcribe(audio)
                 except ProviderError as err:
                     console.print(f"[red]Couldn't transcribe:[/red] {err.reason}")
+                    if wake_detector:
+                        wake_detector.resume()
                     continue
+
                 if not text:
                     console.print("[dim]I couldn't make that out.[/dim]")
+                    if wake_detector:
+                        wake_detector.resume()
                     continue
                 console.print(f"[dim]you said[/dim] {text} [dim]({time.perf_counter() - started:.1f}s)[/dim]")
 
@@ -137,6 +248,9 @@ def main(argv: list[str] | None = None) -> int:
                 if visual:
                     visual.set_state("idle", "")
                 console.print(" [dim](interrupted)[/dim]")
+            finally:
+                if wake_detector:
+                    wake_detector.resume()
     finally:
         mouth.interrupt()
         mouth.close()
