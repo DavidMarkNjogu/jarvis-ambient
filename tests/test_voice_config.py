@@ -32,3 +32,39 @@ def test_groq_ears_without_key_is_a_clear_error():
 def test_unknown_engine_is_a_clear_error():
     with pytest.raises(ValueError, match="JARVIS_TTS"):
         voice_settings_from_env({"JARVIS_TTS": "elevenlabs"}, kokoro_installed=False)
+
+
+def test_wake_defaults():
+    vs = voice_settings_from_env({}, kokoro_installed=False)
+    assert vs.wake_enabled is True
+    assert vs.wake_threshold == 0.5
+    assert vs.voice_speed == 1.1
+
+
+def test_bad_wake_threshold_is_a_clear_error():
+    # String non-number
+    with pytest.raises(ValueError) as exc1:
+        voice_settings_from_env({"WAKE_THRESHOLD": "high"}, kokoro_installed=False)
+    assert "WAKE_THRESHOLD" in str(exc1.value)
+    assert "high" in str(exc1.value)
+
+    # Out of range (1.7)
+    with pytest.raises(ValueError) as exc2:
+        voice_settings_from_env({"WAKE_THRESHOLD": "1.7"}, kokoro_installed=False)
+    assert "WAKE_THRESHOLD" in str(exc2.value)
+    assert "1.7" in str(exc2.value)
+
+
+def test_bad_voice_speed_is_a_clear_error():
+    # String non-number
+    with pytest.raises(ValueError) as exc1:
+        voice_settings_from_env({"JARVIS_VOICE_SPEED": "fast"}, kokoro_installed=False)
+    assert "JARVIS_VOICE_SPEED" in str(exc1.value)
+    assert "fast" in str(exc1.value)
+
+    # Out of range (e.g. 5.0)
+    with pytest.raises(ValueError) as exc2:
+        voice_settings_from_env({"JARVIS_VOICE_SPEED": "5.0"}, kokoro_installed=False)
+    assert "JARVIS_VOICE_SPEED" in str(exc2.value)
+    assert "5.0" in str(exc2.value)
+

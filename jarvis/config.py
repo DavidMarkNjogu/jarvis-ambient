@@ -100,6 +100,9 @@ class VoiceSettings:
     kokoro_voice: str
     windows_voice: str
     groq_key: str | None
+    wake_enabled: bool = True
+    wake_threshold: float = 0.5
+    voice_speed: float = 1.1
 
 
 def voice_settings_from_env(env: Mapping[str, str], kokoro_installed: bool) -> VoiceSettings:
@@ -121,6 +124,30 @@ def voice_settings_from_env(env: Mapping[str, str], kokoro_installed: bool) -> V
     if tts not in {"kokoro", "windows"}:
         raise ValueError(f"JARVIS_TTS must be auto, kokoro or windows, got '{tts}'.")
 
+    wake_raw = env.get("JARVIS_WAKE", "on").strip().lower() or "on"
+    if wake_raw in {"on", "true", "1", "yes"}:
+        wake_enabled = True
+    elif wake_raw in {"off", "false", "0", "no"}:
+        wake_enabled = False
+    else:
+        raise ValueError(f"JARVIS_WAKE must be 'on' or 'off', got '{env.get('JARVIS_WAKE')}'.")
+
+    threshold_raw = env.get("WAKE_THRESHOLD", "0.5").strip() or "0.5"
+    try:
+        threshold = float(threshold_raw)
+        if not (0.0 < threshold < 1.0):
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ValueError(f"WAKE_THRESHOLD must be a float between 0.0 and 1.0, got '{env.get('WAKE_THRESHOLD')}'.")
+
+    speed_raw = env.get("JARVIS_VOICE_SPEED", "1.1").strip() or "1.1"
+    try:
+        voice_speed = float(speed_raw)
+        if not (0.5 <= voice_speed <= 2.5):
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ValueError(f"JARVIS_VOICE_SPEED must be a float between 0.5 and 2.5, got '{env.get('JARVIS_VOICE_SPEED')}'.")
+
     return VoiceSettings(
         stt_engine=stt,
         whisper_model=env.get("WHISPER_MODEL", "").strip() or "base.en",
@@ -129,6 +156,9 @@ def voice_settings_from_env(env: Mapping[str, str], kokoro_installed: bool) -> V
         kokoro_voice=env.get("KOKORO_VOICE", "").strip() or "bm_george",
         windows_voice=env.get("WINDOWS_VOICE", "").strip() or "George",
         groq_key=groq_key,
+        wake_enabled=wake_enabled,
+        wake_threshold=threshold,
+        voice_speed=voice_speed,
     )
 
 
