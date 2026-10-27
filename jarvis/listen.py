@@ -6,10 +6,13 @@ import io
 import wave
 from dataclasses import dataclass
 
+from typing import Any, Iterable, Iterator
+
 import numpy as np
 
 SAMPLE_RATE = 16_000
 BLOCK_SECONDS = 0.03  # 30 ms blocks
+FRAME_SAMPLES = 1280  # 80 ms frames at 16 kHz
 
 
 @dataclass
@@ -25,6 +28,7 @@ class Endpointer:
     max_seconds: float = 20.0
     calibration_seconds: float = 0.3
     min_threshold: float = 0.008
+    block_seconds: float = BLOCK_SECONDS
 
     def __post_init__(self) -> None:
         self._blocks = 0
@@ -34,10 +38,13 @@ class Endpointer:
         self._quiet_blocks = 0
         self.heard_speech = False
 
+    def _to_blocks(self, seconds: float) -> int:
+        return round(seconds / self.block_seconds)
+
     def feed(self, rms: float) -> bool:
         """Feed one block's loudness. Returns True when recording should stop."""
         self._blocks += 1
-        if self._blocks <= _to_blocks(self.calibration_seconds):
+        if self._blocks <= self._to_blocks(self.calibration_seconds):
             self._noise.append(rms)
             self._threshold = max(self.min_threshold, 3.0 * float(np.median(self._noise)))
             return False
@@ -52,11 +59,16 @@ class Endpointer:
             if not self.heard_speech:
                 self._speech_blocks = 0
 
-        if self._blocks >= _to_blocks(self.max_seconds):
+        if self._blocks >= self._to_blocks(self.max_seconds):
             return True
         if not self.heard_speech:
-            return self._blocks >= _to_blocks(self.start_timeout)
-        return self._quiet_blocks >= _to_blocks(self.silence_seconds)
+            return self._blocks >= self._to_blocks(self.start_timeout)
+        return self._quiet_blocks >= self._to_blocks(self.silence_seconds)
+
+    def feed_frame(self, frame: np.ndarray) -> bool:
+        """Feed an audio frame directly by calculating its RMS energy."""
+        rms = float(np.sqrt(np.mean(frame.astype("float32") ** 2)))
+        return self.feed(rms)
 
 
 def _to_blocks(seconds: float) -> int:
@@ -64,16 +76,73 @@ def _to_blocks(seconds: float) -> int:
     return round(seconds / BLOCK_SECONDS)
 
 
-def record_utterance(endpointer: Endpointer | None = None) -> np.ndarray | None:
+class MicStream:
+    """One continuous 16 kHz mono microphone stream yielding fixed-size frames (default 1,280 samples / 80 ms)."""
+
+    def __init__(
+        self,
+        sample_rate: int = SAMPLE_RATE,
+        frame_size: int = FRAME_SAMPLES,
+        source: Iterable[np.ndarray] | np.ndarray | None = None,
+    ) -> None:
+        self.sample_rate = sample_rate
+        self.frame_size = frame_size
+        self._source = source
+        self._closed = False
+        self._stream: Any = None
+
+    def __iter__(self) -> Iterator[np.ndarray]:
+        if self._source is not None:
+            if isinstance(self._source, np.ndarray):
+                for offset in range(0, len(self._source) - self.frame_size + 1, self.frame_size):
+                    yield self._source[offset : offset + self.frame_size]
+            else:
+                for chunk in self._source:
+                    yield chunk
+            return
+
+        import sounddevice as sd
+
+        with sd.InputStream(
+            samplerate=self.sample_rate,
+            channels=1,
+            dtype="float32",
+            blocksize=self.frame_size,
+        ) as stream:
+            self._stream = stream
+            while not self._closed:
+                data, _ = stream.read(self.frame_size)
+                yield data[:, 0].copy()
+
+    def close(self) -> None:
+        self._closed = True
+
+
+def record_utterance(
+    endpointer: Endpointer | None = None,
+    stream: MicStream | Iterator[np.ndarray] | None = None,
+) -> np.ndarray | None:
     """Record one spoken request. Returns 16 kHz mono float32 audio, or None if nobody spoke."""
+    if stream is not None:
+        endpointer = endpointer or Endpointer(block_seconds=0.08)
+        chunks: list[np.ndarray] = []
+        for frame in stream:
+            mono = frame.astype("float32")
+            chunks.append(mono)
+            if endpointer.feed_frame(mono):
+                break
+        if not endpointer.heard_speech:
+            return None
+        return np.concatenate(chunks)
+
     import sounddevice as sd
 
     endpointer = endpointer or Endpointer()
     block = int(SAMPLE_RATE * BLOCK_SECONDS)
-    chunks: list[np.ndarray] = []
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", blocksize=block) as stream:
+    chunks = []
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", blocksize=block) as sd_stream:
         while True:
-            data, _ = stream.read(block)
+            data, _ = sd_stream.read(block)
             mono = data[:, 0].copy()
             chunks.append(mono)
             if endpointer.feed(float(np.sqrt(np.mean(mono**2)))):
