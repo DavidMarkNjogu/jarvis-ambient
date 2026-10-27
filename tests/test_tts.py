@@ -75,9 +75,14 @@ def test_switching_voice_changes_the_active_voice() -> None:
     tokens.Item.side_effect = lambda i: [token1, token2][i]
     fake_sapi.GetVoices.return_value = tokens
 
+    # Discovers installed voices via list_voices
+    available = list_voices(engine="windows", sapi_factory=lambda: fake_sapi)
+    assert "Microsoft Hazel" in available
+
     v = WindowsVoice(prefer="George", sapi_factory=lambda: fake_sapi)
     assert "George" in v.label
 
+    # Switching selects the target voice from the list
     v.set_voice("Hazel")
     assert fake_sapi.Voice == token2
     assert "Hazel" in v.label
