@@ -48,3 +48,15 @@ def test_system_prompt_includes_name_and_time():
     prompt = system_prompt("David", datetime(2026, 10, 20, 19, 5))
     assert "You work for David" in prompt
     assert "Tuesday 20 October 2026, 19:05" in prompt
+
+
+def test_voice_prompt_mentions_voice_commands():
+    voice_prompt = system_prompt("David", mode="voice", voice_name="Microsoft George")
+    assert "/voice" in voice_prompt
+    assert "/speed" in voice_prompt
+    assert "Microsoft George" in voice_prompt
+
+    text_prompt = system_prompt("David", mode="text")
+    assert "/voice" not in text_prompt
+    assert "/speed" not in text_prompt
+
