@@ -49,7 +49,8 @@ def test_fuzz_validate_arguments() -> None:
 
     # 1. Valid cases must always pass
     valid_args = {"name": "test", "count": 10, "ratio": 0.5, "flag": True}
-    validate_arguments(schema, valid_args)
+    res = validate_arguments(schema, valid_args)
+    assert res is None
 
     # 2. Fuzz with invalid types: must always raise ToolError cleanly without unhandled crash
     rnd = random.Random(123)
@@ -69,6 +70,7 @@ def test_fuzz_validate_arguments() -> None:
         object(),
     ]
 
+    errors_caught = 0
     for _ in range(200):
         fuzzed_args = {
             "name": rnd.choice(weird_values),
@@ -79,8 +81,9 @@ def test_fuzz_validate_arguments() -> None:
         try:
             validate_arguments(schema, fuzzed_args)
         except ToolError:
-            # Expected clean validation failure
-            pass
+            errors_caught += 1
+
+    assert errors_caught > 0
 
 
 def test_fuzz_reminder_store_sql_injection_and_weird_strings(tmp_path: Path) -> None:
