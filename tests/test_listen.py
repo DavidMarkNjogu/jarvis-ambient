@@ -97,3 +97,20 @@ def test_endpointer_makes_same_decisions_from_stream_frames():
     assert e1.heard_speech is True
     assert e2.heard_speech is True
 
+
+
+def test_micstream_drain() -> None:
+    from unittest.mock import MagicMock
+    stream = MicStream()
+    mock_sd_stream = MagicMock()
+    mock_sd_stream.read_available = 1280
+    stream._stream = mock_sd_stream
+
+    stream.drain()
+    mock_sd_stream.read.assert_called_once_with(1280)
+
+
+def test_endpointer_env_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('JARVIS_MIC_THRESHOLD', '0.005')
+    e = Endpointer()
+    assert e.min_threshold == 0.005

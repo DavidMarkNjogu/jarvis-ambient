@@ -213,6 +213,8 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
 
                     sd.play(make_chime(), 16000)
                     sd.wait()
+                    if mic_stream is not None:
+                        mic_stream.drain()
 
                 if visual:
                     visual.set_state("listening", "Listening...")

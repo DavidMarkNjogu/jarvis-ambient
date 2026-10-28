@@ -27,10 +27,17 @@ class Endpointer:
     start_timeout: float = 6.0
     max_seconds: float = 20.0
     calibration_seconds: float = 0.3
-    min_threshold: float = 0.008
+    min_threshold: float = 0.003
     block_seconds: float = BLOCK_SECONDS
 
     def __post_init__(self) -> None:
+        import os
+        env_min = os.environ.get('JARVIS_MIC_THRESHOLD')
+        if env_min:
+            try:
+                self.min_threshold = float(env_min)
+            except ValueError:
+                pass
         self._blocks = 0
         self._noise: list[float] = []
         self._threshold = self.min_threshold
@@ -113,6 +120,15 @@ class MicStream:
             while not self._closed:
                 data, _ = stream.read(self.frame_size)
                 yield data[:, 0].copy()
+
+    def drain(self) -> None:
+        if self._stream is not None:
+            try:
+                avail = getattr(self._stream, 'read_available', 0)
+                if avail > 0:
+                    self._stream.read(avail)
+            except Exception:
+                pass
 
     def close(self) -> None:
         self._closed = True
