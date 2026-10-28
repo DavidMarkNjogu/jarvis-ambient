@@ -3,12 +3,28 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Iterator
 from typing import Any, Protocol
 
 from .providers import ProviderError
 
 CUT_OFF_NOTICE = " [connection lost]"
+
+AFFIRMATIVE_WORDS = {"yes", "yeah", "yep", "sure", "proceed", "do it", "confirm", "go ahead"}
+NEGATIVE_WORDS = {"no", "nope", "cancel", "dont", "don't", "stop", "abort", "never mind"}
+
+
+def is_affirmative(text: str) -> bool:
+    clean = re.sub(r"[^\w\s]", "", text.strip().lower())
+    words = set(clean.split())
+    return bool(words & AFFIRMATIVE_WORDS or clean in AFFIRMATIVE_WORDS)
+
+
+def is_negative(text: str) -> bool:
+    clean = re.sub(r"[^\w\s]", "", text.strip().lower())
+    words = set(clean.split())
+    return bool(words & NEGATIVE_WORDS or clean in NEGATIVE_WORDS)
 
 
 class ChatProvider(Protocol):
@@ -45,15 +61,64 @@ class Brain:
         self._on_failure = on_failure
         self.tools = tools
         self.max_tool_steps = max_tool_steps
+        self.pending_confirmation: dict[str, Any] | None = None
 
     def reset(self) -> None:
         self.history.clear()
+        self.pending_confirmation = None
 
     def ask(self, text: str) -> Iterator[str]:
         """Stream a reply, executing tools if requested by the model and feeding results back."""
         text = text.strip()
         if not text:
             return
+
+        # Check for pending confirmation first
+        if self.pending_confirmation is not None:
+            pending = self.pending_confirmation
+            if is_affirmative(text):
+                self.pending_confirmation = None
+                name = pending["name"]
+                args = pending["args"]
+                tc = pending["tc"]
+                provider = pending["provider"]
+                curr_messages = pending["curr_messages"]
+
+                try:
+                    result = self.tools.execute(name, args, confirmed=True)
+                except Exception as exc:
+                    result = {"error": str(exc)}
+
+                curr_messages.append({"role": "assistant", "content": None, "tool_calls": [tc]})
+                curr_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", "call_1"),
+                    "name": name,
+                    "content": json.dumps(result, default=str),
+                })
+
+                tool_schemas = self.tools.to_openai_tools() if self.tools else None
+                try:
+                    stream = provider.stream(curr_messages, tools=tool_schemas)
+                except TypeError:
+                    stream = provider.stream(curr_messages)
+
+                reply = []
+                for piece in stream:
+                    reply.append(piece)
+                    yield piece
+                self._remember(text, "".join(reply))
+                return
+            elif is_negative(text):
+                self.pending_confirmation = None
+                msg = "Action cancelled. Nothing was executed."
+                self._remember(text, msg)
+                yield msg
+                return
+            else:
+                msg = f"Confirmation needed: do you want me to execute {pending['name']}? Please say yes or no."
+                yield msg
+                return
 
         messages = [
             {"role": "system", "content": self._system_prompt()},
@@ -95,6 +160,27 @@ class Brain:
                             args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                         except Exception:
                             args = {}
+
+                        tool_def = None
+                        if self.tools:
+                            try:
+                                tool_def = self.tools.get(name)
+                            except Exception:
+                                tool_def = None
+
+                        if tool_def and tool_def.risk == "confirm":
+                            # Action requires user confirmation before running
+                            self.pending_confirmation = {
+                                "name": name,
+                                "args": args,
+                                "tc": tc,
+                                "provider": provider,
+                                "curr_messages": curr_messages,
+                            }
+                            confirm_msg = f"This action requires confirmation: do you want me to execute {name}? Please say yes to confirm or no to cancel."
+                            self._remember(text, confirm_msg)
+                            yield confirm_msg
+                            return
 
                         try:
                             result = self.tools.execute(name, args, confirmed=True) if self.tools else "No tools"

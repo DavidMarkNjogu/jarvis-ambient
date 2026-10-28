@@ -47,6 +47,43 @@ def test_arguments_are_validated_against_the_schema(tmp_path: Path) -> None:
         registry.execute("set_volume", {"level": 150})
     assert "level" in str(exc_info.value).lower()
 
+    # Test types: number, string, boolean
+    registry.register(
+        ToolDef(
+            name="type_tester",
+            description="Tests type validation",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "num": {"type": "number"},
+                    "txt": {"type": "string"},
+                    "flag": {"type": "boolean"},
+                },
+            },
+            handler=lambda **kwargs: kwargs,
+            risk="safe",
+        )
+    )
+
+    # number invalid
+    with pytest.raises(ToolError) as exc:
+        registry.execute("type_tester", {"num": "not_a_number"})
+    assert "number" in str(exc.value).lower()
+
+    with pytest.raises(ToolError) as exc:
+        registry.execute("type_tester", {"num": True})
+    assert "number" in str(exc.value).lower()
+
+    # string invalid
+    with pytest.raises(ToolError) as exc:
+        registry.execute("type_tester", {"txt": 12345})
+    assert "string" in str(exc.value).lower()
+
+    # boolean invalid
+    with pytest.raises(ToolError) as exc:
+        registry.execute("type_tester", {"flag": "true"})
+    assert "boolean" in str(exc.value).lower()
+
 
 def test_confirm_first_tools_do_nothing_without_a_yes(tmp_path: Path) -> None:
     called = []
@@ -64,6 +101,12 @@ def test_confirm_first_tools_do_nothing_without_a_yes(tmp_path: Path) -> None:
     with pytest.raises(ToolError) as exc_info:
         registry.execute("delete_file", {"path": "test.txt"}, confirmed=False)
     assert "confirmation" in str(exc_info.value).lower()
+    assert called == []
+
+    # Default without confirmed parameter must also require confirmation
+    with pytest.raises(ToolError) as exc_info2:
+        registry.execute("delete_file", {"path": "test.txt"})
+    assert "confirmation" in str(exc_info2.value).lower()
     assert called == []
 
 

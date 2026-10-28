@@ -1,10 +1,12 @@
-# Done Contract: Jarvis Speaking Visualizer (Minimal Aperture)
+# Done Contract: Autonomous Fix of Current Issues (/loop)
+
+StartedAt: 2026-10-29T02:00:34+03:00
+Timeline: 35m
 
 ## Acceptance Criteria
-- [x] Visual server module `jarvis/visual.py` runs using Python standard library (zero external pip packages). Evidence: `ThreadingHTTPServer` + SSE implementation with 0 pip dependencies.
-- [x] SSE `/events` endpoint broadcasts JSON messages for `idle`, `listening`, `thinking`, and `speaking` states with current sentence text. Evidence: Verified in `test_visual_server_sse_stream` and live Playwright test.
-- [x] Modern, zero-slop UI in `jarvis/static/visualizer.html` using Archivo & IBM Plex Mono fonts and dark HUD styling. Evidence: Verified `document.fonts.check()` returns true for both fonts; 0 emojis; WCAG AA compliant.
-- [x] Orb animates smoothly: rotating dashed rings and breathing/pulsing core scaled to state. Evidence: Concentric SVG/CSS ring keyframe animations for idle, listening, thinking, speaking.
-- [x] `jarvis/voice.py` updates state appropriately during the live speech conversation cycle. Evidence: Wired into `greet`, `record_utterance`, `transcribe`, and `respond` streaming loops.
-- [x] Integration and unit tests in `tests/test_visual.py` pass with 100% success rate (`pytest`). Evidence: 8 passed in 1.37s; total repo test suite 61 passed in 2.23s.
-- [x] Zero lint/syntax errors and clean git status. Evidence: All pytest checks green, screenshots verified at 1440px and 390px with zero horizontal overflow.
+- [x] Fix confirmation gate in `jarvis/brain.py` so tools with `risk == "confirm"` are not blindly executed with `confirmed=True`, but require user confirmation.
+- [x] Add unit tests in `tests/test_brain.py` proving that `Brain` pauses and asks for confirmation for `risk == "confirm"` tools without running them until confirmed.
+- [x] Address `scripts/live_checks.py e2e` (P2-L3) latency limit and investigate network/model response optimization.
+- [x] Run mutation testing (`scripts/verify.py --mutate`) across `jarvis/tools/*.py` to ensure all tests pin code behavior.
+- [x] Full test suite (`pytest`) passes with 100% success (115 passed, 0 failed).
+- [x] `scripts/verify.py` passes cleanly with 0 failures on clean git commit.

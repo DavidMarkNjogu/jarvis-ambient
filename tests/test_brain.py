@@ -214,3 +214,153 @@ def test_tool_loop_stops_after_max_steps():
     reply = "".join(brain.ask("start loop"))
     assert len(provider.calls) == 5
     assert "maximum" in reply.lower() or "limit" in reply.lower() or "stopped" in reply.lower()
+
+
+def test_brain_requires_confirmation_for_confirm_risk_tools():
+    from jarvis.tools import ToolRegistry, ToolDef
+
+    deleted = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDef(
+            name="delete_file",
+            description="Deletes a file",
+            parameters={"type": "object", "properties": {"filename": {"type": "string"}}},
+            handler=lambda filename: deleted.append(filename) or "deleted",
+            risk="confirm",
+        )
+    )
+
+    class ConfirmToolProvider:
+        name = "gemini"
+        model = "gemini-model"
+
+        def __init__(self):
+            self.calls = []
+            self.last_tool_calls = []
+            self._step = 0
+
+        def stream(self, messages, tools=None):
+            self.calls.append(messages)
+            self._step += 1
+            if self._step == 1:
+                self.last_tool_calls = [
+                    {"id": "c1", "type": "function", "function": {"name": "delete_file", "arguments": '{"filename": "test.txt"}'}}
+                ]
+                return iter([])
+            else:
+                self.last_tool_calls = []
+                return iter(["File has been deleted."])
+
+    provider = ConfirmToolProvider()
+    brain = Brain([provider], system_prompt=lambda: "SYS", tools=registry)
+
+    # 1. First ask: user says "delete test.txt". Brain must ask for confirmation and NOT run the tool
+    q1 = "".join(brain.ask("delete test.txt"))
+    assert "confirm" in q1.lower()
+    assert deleted == []
+    assert brain.pending_confirmation is not None
+
+    # 2. User says "yes": Brain must execute the tool and provide final response
+    q2 = "".join(brain.ask("yes"))
+    assert deleted == ["test.txt"]
+    assert "File has been deleted" in q2
+    assert brain.pending_confirmation is None
+
+
+def test_brain_cancels_confirm_risk_tool_when_user_says_no():
+    from jarvis.tools import ToolRegistry, ToolDef
+
+    deleted = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDef(
+            name="delete_file",
+            description="Deletes a file",
+            parameters={"type": "object", "properties": {"filename": {"type": "string"}}},
+            handler=lambda filename: deleted.append(filename) or "deleted",
+            risk="confirm",
+        )
+    )
+
+    class ConfirmToolProvider:
+        name = "gemini"
+        model = "gemini-model"
+
+        def __init__(self):
+            self.calls = []
+            self.last_tool_calls = [
+                {"id": "c1", "type": "function", "function": {"name": "delete_file", "arguments": '{"filename": "test.txt"}'}}
+            ]
+
+        def stream(self, messages, tools=None):
+            self.calls.append(messages)
+            return iter([])
+
+    provider = ConfirmToolProvider()
+    brain = Brain([provider], system_prompt=lambda: "SYS", tools=registry)
+
+    q1 = "".join(brain.ask("delete test.txt"))
+    assert "confirm" in q1.lower()
+    assert deleted == []
+
+    # User says "no"
+    q2 = "".join(brain.ask("no"))
+    assert "cancel" in q2.lower()
+    assert deleted == []
+    assert brain.pending_confirmation is None
+
+
+def test_is_affirmative_and_negative_matching():
+    from jarvis.brain import is_affirmative, is_negative
+
+    # Multi-word exact phrases
+    assert is_affirmative("do it")
+    assert is_affirmative("go ahead")
+    assert is_negative("never mind")
+
+    # Word contained in sentence
+    assert is_affirmative("yes please")
+    assert is_affirmative("yeah, sure!")
+    assert is_negative("no thanks")
+    assert is_negative("don't do that")
+
+    # Neutral or unrelated
+    assert not is_affirmative("maybe tomorrow")
+    assert not is_negative("tell me a joke")
+
+
+def test_brain_clarification_on_ambiguous_confirmation():
+    from jarvis.tools import ToolRegistry, ToolDef
+
+    registry = ToolRegistry()
+    registry.register(
+        ToolDef(
+            name="delete_file",
+            description="Deletes a file",
+            parameters={"type": "object", "properties": {"filename": {"type": "string"}}},
+            handler=lambda filename: "deleted",
+            risk="confirm",
+        )
+    )
+
+    class ConfirmToolProvider:
+        name = "gemini"
+        model = "gemini-model"
+        calls = []
+        last_tool_calls = [
+            {"id": "c1", "type": "function", "function": {"name": "delete_file", "arguments": '{"filename": "test.txt"}'}}
+        ]
+
+        def stream(self, messages, tools=None):
+            return iter([])
+
+    brain = Brain([ConfirmToolProvider()], system_prompt=lambda: "SYS", tools=registry)
+    _ = "".join(brain.ask("delete test.txt"))
+    assert brain.pending_confirmation is not None
+
+    # Ambiguous reply
+    clarification = "".join(brain.ask("what is the weather today?"))
+    assert "please say yes or no" in clarification.lower()
+    assert brain.pending_confirmation is not None
+
