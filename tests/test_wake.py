@@ -73,3 +73,20 @@ def test_resume_clears_the_buffer() -> None:
     assert not detector.process_score(0.2, timestamp=2.0)
     # Fresh high score after resume fires
     assert detector.process_score(0.9, timestamp=2.5)
+
+
+def test_process_frame_converts_float32_to_int16() -> None:
+    detector = WakeDetector(threshold=0.5)
+    captured: dict = {}
+
+    class FakeModel:
+        def predict(self, frame: np.ndarray) -> dict[str, float]:
+            captured["dtype"] = frame.dtype
+            captured["max"] = int(np.max(frame))
+            return {"hey_jarvis": 0.8}
+
+    detector._model = FakeModel()
+    float_frame = np.array([0.5, -0.5], dtype=np.float32)
+    assert detector.process_frame(float_frame)
+    assert captured["dtype"] == np.int16
+    assert captured["max"] == int(0.5 * 32767)

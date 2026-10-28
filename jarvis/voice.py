@@ -239,6 +239,9 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
                     continue
                 console.print(f"[dim]you said[/dim] {text} [dim]({time.perf_counter() - started:.1f}s)[/dim]")
 
+            if not text or not text.strip():
+                continue
+
             try:
                 if visual:
                     visual.set_state("thinking", "Synthesizing answer...")

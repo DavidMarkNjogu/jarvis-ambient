@@ -237,6 +237,88 @@ body.state-speaking .core {
   }
 }
 
+/* Sound Wave Visualizer (21st.dev inspired micro-equalizer) */
+.sound-wave {
+  position: absolute;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 48px;
+  width: 120px;
+}
+
+.bar {
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: var(--dim);
+  opacity: 0.35;
+  transition: all 0.35s ease;
+}
+
+/* Wave: Listening */
+body.state-listening .bar {
+  background-color: var(--color-listening);
+  opacity: 0.85;
+  animation: wave-listening 1.1s ease-in-out infinite alternate;
+}
+body.state-listening .bar-1 { animation-delay: 0.0s; }
+body.state-listening .bar-2 { animation-delay: 0.2s; }
+body.state-listening .bar-3 { animation-delay: 0.4s; }
+body.state-listening .bar-4 { animation-delay: 0.2s; }
+body.state-listening .bar-5 { animation-delay: 0.1s; }
+
+/* Wave: Thinking */
+body.state-thinking .bar {
+  background-color: var(--color-thinking);
+  opacity: 0.85;
+  animation: wave-thinking 0.8s ease-in-out infinite;
+}
+body.state-thinking .bar-1 { animation-delay: 0.0s; }
+body.state-thinking .bar-2 { animation-delay: 0.15s; }
+body.state-thinking .bar-3 { animation-delay: 0.3s; }
+body.state-thinking .bar-4 { animation-delay: 0.45s; }
+body.state-thinking .bar-5 { animation-delay: 0.6s; }
+
+/* Wave: Speaking */
+body.state-speaking .bar {
+  background-color: var(--accent-glow);
+  box-shadow: 0 0 10px rgba(89, 195, 227, 0.7);
+  opacity: 1;
+  animation: wave-speaking 0.45s ease-in-out infinite alternate;
+}
+body.state-speaking .bar-1 { animation-delay: 0.05s; }
+body.state-speaking .bar-2 { animation-delay: 0.25s; }
+body.state-speaking .bar-3 { animation-delay: 0.12s; }
+body.state-speaking .bar-4 { animation-delay: 0.35s; }
+body.state-speaking .bar-5 { animation-delay: 0.18s; }
+
+/* Wave: Error */
+body.state-error .bar {
+  background-color: var(--color-error);
+  box-shadow: 0 0 8px var(--color-error);
+  height: 6px;
+  opacity: 0.9;
+}
+
+@keyframes wave-listening {
+  0% { height: 4px; }
+  100% { height: 22px; }
+}
+
+@keyframes wave-thinking {
+  0%, 100% { height: 4px; opacity: 0.3; }
+  50% { height: 18px; opacity: 1; }
+}
+
+@keyframes wave-speaking {
+  0% { height: 6px; }
+  50% { height: 38px; }
+  100% { height: 16px; }
+}
+
 @media (max-width: 480px) {
   .aperture-container {
     border: none;

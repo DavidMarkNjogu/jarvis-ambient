@@ -96,6 +96,8 @@ class WakeDetector:
             return False
 
         self._ensure_model_loaded()
+        if frame.dtype != np.int16:
+            frame = (np.clip(frame, -1.0, 1.0) * 32767).astype(np.int16)
         prediction = self._model.predict(frame)
         score = float(prediction.get(self.model_name, 0.0))
         return self.process_score(score, timestamp=timestamp)

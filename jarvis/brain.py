@@ -49,6 +49,9 @@ class Brain:
         Falls back only before the first piece of text arrives, so a reply is never
         stitched together from two different models.
         """
+        text = text.strip()
+        if not text:
+            return
         messages = [
             {"role": "system", "content": self._system_prompt()},
             *self.history[-2 * self._history_turns:],

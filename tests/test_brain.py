@@ -119,3 +119,12 @@ def test_reset_forgets_history():
 def test_needs_a_provider():
     with pytest.raises(ValueError):
         Brain([], system_prompt=lambda: "")
+
+
+def test_empty_or_whitespace_message_is_ignored():
+    p = FakeProvider("gemini", ["should not be called"])
+    brain = make_brain(p)
+    assert list(brain.ask("")) == []
+    assert list(brain.ask("   \n\t  ")) == []
+    assert p.calls == []
+    assert brain.history == []
