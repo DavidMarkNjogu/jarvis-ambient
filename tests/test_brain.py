@@ -128,3 +128,89 @@ def test_empty_or_whitespace_message_is_ignored():
     assert list(brain.ask("   \n\t  ")) == []
     assert p.calls == []
     assert brain.history == []
+
+
+def test_brain_executes_tool_and_feeds_result_back():
+    from jarvis.tools import ToolRegistry, ToolDef
+
+    registry = ToolRegistry()
+    registry.register(
+        ToolDef(
+            name="get_time",
+            description="Get current time",
+            parameters={"type": "object", "properties": {}},
+            handler=lambda: {"time": "14:30:00"},
+            risk="safe",
+        )
+    )
+
+    class ToolCallingProvider:
+        name = "gemini"
+        model = "gemini-model"
+
+        def __init__(self):
+            self.calls = []
+            self.last_tool_calls = []
+            self._step = 0
+
+        def stream(self, messages, tools=None):
+            self.calls.append(messages)
+            self._step += 1
+            if self._step == 1:
+                self.last_tool_calls = [
+                    {"id": "call_t1", "type": "function", "function": {"name": "get_time", "arguments": "{}"}}
+                ]
+                return iter([])
+            else:
+                self.last_tool_calls = []
+                return iter(["It is ", "2:30 PM."])
+
+    provider = ToolCallingProvider()
+    brain = Brain(
+        [provider],
+        system_prompt=lambda: "SYS",
+        tools=registry,
+    )
+
+    reply = "".join(brain.ask("what time is it"))
+    assert reply == "It is 2:30 PM."
+    assert len(provider.calls) == 2
+    # Verify second call included the tool output
+    second_call_messages = provider.calls[1]
+    assert any(m.get("role") == "tool" and "14:30:00" in str(m.get("content")) for m in second_call_messages)
+
+
+def test_tool_loop_stops_after_max_steps():
+    from jarvis.tools import ToolRegistry, ToolDef
+
+    registry = ToolRegistry()
+    registry.register(
+        ToolDef(
+            name="ping",
+            description="ping",
+            parameters={"type": "object", "properties": {}},
+            handler=lambda: "pong",
+            risk="safe",
+        )
+    )
+
+    class InfiniteToolProvider:
+        name = "gemini"
+        model = "gemini-model"
+
+        def __init__(self):
+            self.calls = []
+            self.last_tool_calls = [
+                {"id": "call_loop", "type": "function", "function": {"name": "ping", "arguments": "{}"}}
+            ]
+
+        def stream(self, messages, tools=None):
+            self.calls.append(messages)
+            return iter([])
+
+    provider = InfiniteToolProvider()
+    brain = Brain([provider], system_prompt=lambda: "SYS", tools=registry, max_tool_steps=5)
+
+    reply = "".join(brain.ask("start loop"))
+    assert len(provider.calls) == 5
+    assert "maximum" in reply.lower() or "limit" in reply.lower() or "stopped" in reply.lower()

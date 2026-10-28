@@ -102,3 +102,17 @@ def test_list_models_strips_gemini_prefix():
         return httpx.Response(200, json={"data": [{"id": "models/gemini-b"}, {"id": "models/gemini-a"}]})
 
     assert provider_with(handler).list_models() == ["gemini-a", "gemini-b"]
+
+
+def test_tool_call_deltas_are_assembled():
+    deltas = [
+        {"tool_calls": [{"index": 0, "id": "call_abc", "type": "function", "function": {"name": "get_", "arguments": ""}}]},
+        {"tool_calls": [{"index": 0, "function": {"name": "time", "arguments": "{\"zone\":"}}]},
+        {"tool_calls": [{"index": 0, "function": {"arguments": " \"Africa/Nairobi\"}"}}]},
+    ]
+    assembled = Provider.assemble_tool_calls(deltas)
+    assert len(assembled) == 1
+    call = assembled[0]
+    assert call["id"] == "call_abc"
+    assert call["function"]["name"] == "get_time"
+    assert json.loads(call["function"]["arguments"]) == {"zone": "Africa/Nairobi"}

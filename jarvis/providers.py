@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from typing import Any
 
 import httpx
 
@@ -21,6 +22,7 @@ class Provider:
     def __init__(self, config: ProviderConfig, client: httpx.Client | None = None):
         self.name = config.name
         self.model = config.model
+        self.last_tool_calls: list[dict] = []
         headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
         self._client = client or httpx.Client(
             base_url=config.base_url,
@@ -28,18 +30,49 @@ class Provider:
             timeout=httpx.Timeout(60.0, connect=5.0),
         )
 
-    def stream(self, messages: list[dict]) -> Iterator[str]:
+    @staticmethod
+    def assemble_tool_calls(deltas: list[dict]) -> list[dict]:
+        calls: dict[int, dict] = {}
+        for d in deltas:
+            for tc in d.get("tool_calls", []):
+                idx = tc.get("index", 0)
+                if idx not in calls:
+                    calls[idx] = {
+                        "id": tc.get("id", ""),
+                        "type": tc.get("type", "function"),
+                        "function": {"name": "", "arguments": ""},
+                    }
+                cur = calls[idx]
+                if tc.get("id"):
+                    cur["id"] = tc["id"]
+                fn = tc.get("function", {})
+                if fn.get("name"):
+                    cur["function"]["name"] += fn["name"]
+                if fn.get("arguments"):
+                    cur["function"]["arguments"] += fn["arguments"]
+        return [calls[i] for i in sorted(calls.keys())]
+
+    def stream(self, messages: list[dict], tools: list[dict] | None = None) -> Iterator[str]:
         """Yield the reply text piece by piece as it arrives."""
-        payload = {"model": self.model, "messages": messages, "stream": True}
+        self.last_tool_calls = []
+        raw_tool_deltas: list[dict] = []
+        payload: dict[str, Any] = {"model": self.model, "messages": messages, "stream": True}
+        if tools:
+            payload["tools"] = tools
+
         try:
             with self._client.stream("POST", "chat/completions", json=payload) as response:
                 if response.status_code != 200:
                     response.read()
                     raise ProviderError(self.name, _describe_status(response, self.model))
                 for line in response.iter_lines():
-                    text = self._parse_sse_line(line)
+                    text, tc_delta = self._parse_sse_line(line)
+                    if tc_delta:
+                        raw_tool_deltas.append(tc_delta)
                     if text:
                         yield text
+                if raw_tool_deltas:
+                    self.last_tool_calls = Provider.assemble_tool_calls(raw_tool_deltas)
         except httpx.TimeoutException as exc:
             raise ProviderError(self.name, "took too long to answer") from exc
         except httpx.TransportError as exc:
@@ -56,20 +89,23 @@ class Provider:
         ids = [m.get("id", "") for m in response.json().get("data", [])]
         return sorted(i.removeprefix("models/") for i in ids if i)
 
-    def _parse_sse_line(self, line: str) -> str:
+    def _parse_sse_line(self, line: str) -> tuple[str, dict | None]:
         if not line.startswith("data:"):
-            return ""
+            return "", None
         data = line[len("data:"):].strip()
         if not data or data == "[DONE]":
-            return ""
+            return "", None
         try:
             event = json.loads(data)
         except json.JSONDecodeError:
-            return ""
+            return "", None
         if "error" in event:
             raise ProviderError(self.name, _error_message(event) or "failed mid-reply")
         choices = event.get("choices") or [{}]
-        return (choices[0].get("delta") or {}).get("content") or ""
+        delta = choices[0].get("delta") or {}
+        content = delta.get("content") or ""
+        tc_delta = {"tool_calls": delta["tool_calls"]} if "tool_calls" in delta else None
+        return content, tc_delta
 
 
 def _describe_status(response: httpx.Response, model: str) -> str:
@@ -98,5 +134,5 @@ def _error_message(body: object) -> str:
         return ""
     error = body.get("error")
     if isinstance(error, dict):
-        return str(error.get("message", ""))
-    return str(error or "")
+        return str(error.get("message") or "")
+    return ""

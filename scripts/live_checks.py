@@ -155,7 +155,53 @@ def check_wake() -> int:
         return done("wake", ok, f"woke={woke} (frame {wake_frame}/{total_frames}); heard {heard!r} in {took:.1f}s")
 
 
-CHECKS = {"brain": check_brain, "stt": check_stt, "tts": check_tts, "e2e": check_e2e, "wake": check_wake}
+def check_tools() -> int:
+    import datetime
+    import zoneinfo
+    from jarvis.config import load_settings
+    from jarvis.personality import system_prompt
+    from jarvis.providers import Provider
+    from jarvis.brain import Brain
+    from jarvis.tools import default_registry
+
+    settings = load_settings()
+    registry = default_registry()
+    try:
+        tz = zoneinfo.ZoneInfo("Africa/Nairobi")
+    except Exception:
+        tz = datetime.timezone(datetime.timedelta(hours=3), name="Africa/Nairobi")
+    now_eat = datetime.datetime.now(tz)
+    expected_hour_24 = str(now_eat.hour)
+    expected_hour_12 = str((now_eat.hour % 12) or 12)
+
+    brain = Brain(
+        [Provider(p) for p in settings.providers],
+        system_prompt=lambda: system_prompt(settings.user_name, tools=[t.name for t in registry.list_tools()]),
+        tools=registry,
+    )
+
+    started = time.perf_counter()
+    reply = "".join(brain.ask("what time is it right now?"))
+    took = time.perf_counter() - started
+
+    hour_words = {
+        1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+        7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"
+    }
+    h12 = (now_eat.hour % 12) or 12
+    h_word = hour_words.get(h12, "")
+    ok = (expected_hour_24 in reply) or (expected_hour_12 in reply) or (bool(h_word) and h_word in reply.lower())
+    return done("tools", ok, f"answered in {took:.1f}s: {reply!r} (expected hour {expected_hour_24} or {expected_hour_12})")
+
+
+CHECKS = {
+    "brain": check_brain,
+    "stt": check_stt,
+    "tts": check_tts,
+    "e2e": check_e2e,
+    "wake": check_wake,
+    "tools": check_tools,
+}
 
 
 def main() -> int:

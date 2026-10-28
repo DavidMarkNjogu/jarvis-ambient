@@ -60,3 +60,15 @@ def test_voice_prompt_mentions_voice_commands():
     assert "/voice" not in text_prompt
     assert "/speed" not in text_prompt
 
+
+
+def test_prompt_lists_exactly_the_registered_tools():
+    tools = ["get_time", "get_weather", "open_app"]
+    prompt = system_prompt("David", tools=tools)
+    for t in tools:
+        assert t in prompt
+    assert "not connected" in prompt.lower()
+
+    empty_prompt = system_prompt("David", tools=[])
+    assert "get_time" not in empty_prompt
+    assert "not connected" in empty_prompt.lower()

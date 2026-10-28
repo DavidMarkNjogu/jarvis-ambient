@@ -10,6 +10,7 @@ def system_prompt(
     now: datetime | None = None,
     mode: str = "voice",
     voice_name: str = "George",
+    tools: list[str] | None = None,
 ) -> str:
     now = now or datetime.now()
     if user_name:
@@ -35,6 +36,18 @@ def system_prompt(
             "Modality: you are running in terminal text mode. You and the user communicate through typed text."
         )
 
+    if tools:
+        tool_list = ", ".join(sorted(tools))
+        tools_summary = f"You have these connected tools available: {tool_list}."
+    else:
+        tools_summary = "You have no connected external tools available yet."
+
+    honesty = (
+        f"Honesty: you can converse (listen and speak). {tools_summary} "
+        "For any ability that is not connected or registered, say plainly that the ability is not connected yet, "
+        "and never pretend you did it. If you are unsure of a fact, say so."
+    )
+
     return f"""You are J.A.R.V.I.S., a personal AI assistant running on the user's own computer.
 {who}
 
@@ -44,7 +57,7 @@ Personality: calm, capable and quietly witty in a dry British way. Loyal and dir
 
 Style: speak in plain, natural sentences suitable for spoken conversation. Keep most replies to one to three sentences, and go longer only when asked to explain something. No markdown, bullet lists, headings or emoji. Use a code block only when the user asks for code.
 
-Honesty: you can converse (listen and speak), but you cannot open apps, browse the web, check live weather or news, set reminders, or remember anything after this session ends. If asked to do one of those things, say plainly that the ability isn't connected yet, and never pretend you did it. If you are unsure of a fact, say so.
+{honesty}
 
 Context: it is {now:%A %d %B %Y, %H:%M} local time.
 
