@@ -18,6 +18,19 @@ Exact commands for this machine (Windows 10 Pro, Windows PowerShell 5.1, project
 
 `voice.bat` options: `--no-visual` (no browser HUD), `--port 5051`. Environment: `JARVIS_VISUAL=0` turns the HUD off, `JARVIS_NO_BROWSER=1` starts the HUD server without opening a browser tab.
 
+## Desktop app & autostart
+
+Jarvis can run as a standalone desktop app with a custom arc-reactor emblem, headless background listener, and dedicated aperture HUD.
+
+| Task | Command |
+|---|---|
+| Install/Update Desktop shortcut | `.venv\Scripts\python scripts\setup_desktop.py --desktop` |
+| Launch on Windows startup | `.venv\Scripts\python scripts\setup_desktop.py --autostart` |
+| Remove Windows startup | `.venv\Scripts\python scripts\setup_desktop.py --remove-autostart` |
+| Hardware mic diagnostics | `.venv\Scripts\python scripts\test_mic.py` |
+
+The desktop shortcut launches `.venv\Scripts\pythonw.exe -m jarvis.voice` directly. `pythonw.exe` suppresses the black console window without requiring Windows Script Host (`.vbs`), ensuring compatibility with security policies and antivirus tools.
+
 ## Settings (`.env`)
 
 Never print the file; it holds the key. List the names only:
@@ -123,6 +136,7 @@ Windows can speak into a WAV file, which the real transcriber then hears. `scrip
 | "model ... was not found" | The provider retired a model name | `jarvis.bat`, `/models`, set `GEMINI_MODEL` |
 | Nothing recorded, "I didn't hear anything" | Microphone blocked or wrong device | Settings, Privacy, Microphone, allow desktop apps; `sounddevice.query_devices()` |
 | Spoken reply cut off or silent | Voice engine error | The loop prints "voice problem: ..."; try `WINDOWS_VOICE`; run `live_checks.py tts` |
+| "There is no script engine for file extension '.vbs'" | Windows Script Host disabled | Re-run `.venv\Scripts\python scripts\setup_desktop.py --desktop` to use native `pythonw.exe` |
 | HUD does not open | Port busy or browser blocked | It tries the next free port; open the printed address by hand |
 | First start takes over a minute | Whisper model loading or downloading | Normal the first time |
 | `pip` or `pytest` errors about writing files | Disk full | See Disk |

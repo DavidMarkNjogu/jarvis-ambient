@@ -19,6 +19,7 @@ Add an entry whenever you make a real decision (a dependency, an approach, a tra
 | D-11 | 26 Oct | Tool confirmation will be decided by code, not by the model (planned for phase 4) | A model can be talked into saying "the user said yes" | A simple yes/no matcher gates every `confirm` tool |
 | D-12 | 26 Oct | Memory will start as SQLite with full-text search, not Chroma (planned for phase 5) | Chroma brings many dependencies on a disk with no room | Semantic search later via Gemini embeddings stored in SQLite if keyword search proves weak |
 | D-13 | 26 Oct | Documentation is plain Markdown plus Python scripts, in `AGENTS.md` form | Must work with any coding agent and survive the end of David's Claude Pro plan | No Claude-only features anywhere |
+| D-14 | 28 Oct | Standalone Desktop App launcher points directly to `pythonw.exe -m jarvis.voice` with custom `jarvis.ico`; zero VBScript dependency | Avoids blocked Windows Script Host (`.vbs`) engines on hardened OS/antivirus setups while running headless without a persistent black console window. Opens HUD aperture in native standalone app mode (`--app=http://127.0.0.1:5050`) | Standard Windows `.lnk` file created via `scripts/setup_desktop.py`. Clean execution on all Windows versions |
 
 ## Questions waiting for David
 

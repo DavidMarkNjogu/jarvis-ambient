@@ -16,19 +16,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ICON_PATH = ROOT / "jarvis.ico"
-VBS_PATH = ROOT / "jarvis.vbs"
+PYTHONW_PATH = ROOT / ".venv" / "Scripts" / "pythonw.exe"
 
 
 def create_shortcut(target_path: Path, name: str = "Jarvis") -> bool:
-    """Create a Windows .lnk shortcut pointing to jarvis.vbs using WScript.Shell."""
-    desktop = Path(os.path.expandvars(r"%USERPROFILE%\Desktop"))
+    """Create a Windows .lnk shortcut pointing directly to pythonw.exe (no VBScript dependency)."""
     lnk_path = target_path / f"{name}.lnk"
 
     ps_script = (
         f"$ws = New-Object -ComObject WScript.Shell; "
         f"$s = $ws.CreateShortcut('{lnk_path}'); "
-        f"$s.TargetPath = 'wscript.exe'; "
-        f"$s.Arguments = '`\"{VBS_PATH}`\"'; "
+        f"$s.TargetPath = '{PYTHONW_PATH}'; "
+        f"$s.Arguments = '-m jarvis.voice'; "
         f"$s.WorkingDirectory = '{ROOT}'; "
         f"$s.Description = 'J.A.R.V.I.S. Voice Assistant'; "
         f"$s.IconLocation = '{ICON_PATH}, 0'; "
