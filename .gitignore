@@ -6,3 +6,4 @@ data/
 models/
 history/
 acceptance/last-report.json
+.agents/task-queue.md
