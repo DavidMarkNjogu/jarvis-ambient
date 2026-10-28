@@ -86,3 +86,65 @@ def test_switching_voice_changes_the_active_voice() -> None:
     v.set_voice("Hazel")
     assert fake_sapi.Voice == token2
     assert "Hazel" in v.label
+
+
+
+def test_is_british_recognition() -> None:
+    from jarvis.tts import _is_british
+    assert _is_british("Microsoft George - English (United Kingdom)")
+    assert _is_british("Hazel - Great Britain")
+    assert not _is_british("Microsoft David - English (United States)")
+
+
+def test_mouth_queue_and_wait() -> None:
+    from jarvis.tts import Mouth
+
+    class FakeVoice:
+        label = "fake"
+        def __init__(self):
+            self.spoken = []
+        def speak(self, sentence: str) -> None:
+            self.spoken.append(sentence)
+        def stop(self) -> None:
+            pass
+
+    fake_voice = FakeVoice()
+    mouth = Mouth(lambda: fake_voice)
+    assert mouth.label == "fake"
+    assert mouth._thread.daemon is True
+
+    mouth.say("hello")
+    mouth.say("world")
+    mouth.wait()
+    assert fake_voice.spoken == ["hello", "world"]
+
+    mouth.close()
+
+
+def test_mouth_interrupt() -> None:
+    from jarvis.tts import Mouth
+    import time
+
+    stopped = []
+    class FakeVoice:
+        label = "fake"
+        def speak(self, sentence: str) -> None:
+            time.sleep(0.05)
+        def stop(self) -> None:
+            stopped.append(True)
+
+    mouth = Mouth(FakeVoice)
+    for i in range(10):
+        mouth.say(f"sentence {i}")
+    mouth.interrupt()
+    assert len(stopped) > 0
+    mouth.close()
+
+
+def test_kokoro_default_play_audio() -> None:
+    fake_kokoro = MagicMock()
+    voice = KokoroVoice(
+        voice="bm_george",
+        kokoro_factory=lambda m, v: fake_kokoro,
+    )
+    assert voice._play_audio is True
