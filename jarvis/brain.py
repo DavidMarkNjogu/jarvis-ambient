@@ -18,13 +18,23 @@ NEGATIVE_WORDS = {"no", "nope", "cancel", "dont", "don't", "stop", "abort", "nev
 def is_affirmative(text: str) -> bool:
     clean = re.sub(r"[^\w\s]", "", text.strip().lower())
     words = set(clean.split())
-    return bool(words & AFFIRMATIVE_WORDS or clean in AFFIRMATIVE_WORDS)
+    if words & AFFIRMATIVE_WORDS:
+        return True
+    for phrase in AFFIRMATIVE_WORDS:
+        if " " in phrase and re.search(r"\b" + re.escape(phrase) + r"\b", clean):
+            return True
+    return False
 
 
 def is_negative(text: str) -> bool:
     clean = re.sub(r"[^\w\s]", "", text.strip().lower())
     words = set(clean.split())
-    return bool(words & NEGATIVE_WORDS or clean in NEGATIVE_WORDS)
+    if words & NEGATIVE_WORDS:
+        return True
+    for phrase in NEGATIVE_WORDS:
+        if " " in phrase and re.search(r"\b" + re.escape(phrase) + r"\b", clean):
+            return True
+    return False
 
 
 class ChatProvider(Protocol):
