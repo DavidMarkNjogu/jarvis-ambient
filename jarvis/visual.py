@@ -203,6 +203,30 @@ class SilentThreadingHTTPServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+def launch_app_window(url: str, width: int = 420, height: int = 580) -> bool:
+    """Launch the HUD in a standalone, frameless desktop window using Edge or Chrome app mode."""
+    candidates = [
+        os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+        os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+        os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+        os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+    ]
+    for exe in candidates:
+        if os.path.exists(exe):
+            try:
+                import subprocess
+
+                subprocess.Popen([
+                    exe,
+                    f"--app={url}",
+                    f"--window-size={width},{height}",
+                ])
+                return True
+            except Exception:
+                pass
+    return False
+
+
 class VisualServer:
     """Manages the background visual HTTP/SSE server."""
 
@@ -224,7 +248,11 @@ class VisualServer:
         self._thread.start()
         url = f"http://127.0.0.1:{self.port}"
         if self.auto_open and os.environ.get("JARVIS_NO_BROWSER") != "1":
-            threading.Thread(target=lambda: webbrowser.open(url), daemon=True).start()
+            def _open():
+                if not launch_app_window(url):
+                    webbrowser.open(url)
+
+            threading.Thread(target=_open, daemon=True).start()
         return url
 
     def set_state(self, status: str, text: str = "") -> None:
