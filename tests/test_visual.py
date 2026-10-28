@@ -218,3 +218,39 @@ def test_abrupt_client_disconnect() -> None:
     finally:
         server.stop()
 
+
+
+def test_broadcaster_close() -> None:
+    b = VisualBroadcaster()
+    q = b.subscribe()
+    assert b._active is True
+    b.close()
+    assert b._active is False
+    assert len(b._subscribers) == 0
+
+
+def test_find_free_port_skips_occupied_port() -> None:
+    import socket
+    s = socket.socket()
+    s.bind(('127.0.0.1', 5400))
+    s.listen(1)
+    try:
+        next_port = find_free_port(5400, max_attempts=5)
+        assert next_port == 5401
+    finally:
+        s.close()
+
+
+def test_visual_server_auto_open(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+    from jarvis import visual
+    opened = []
+    monkeypatch.setattr(visual, 'launch_app_window', lambda u: opened.append(u) or True)
+    server = VisualServer(port=find_free_port(5450), auto_open=True)
+    url = server.start()
+    try:
+        time.sleep(0.1)
+        assert len(opened) == 1
+        assert opened[0] == url
+    finally:
+        server.stop()

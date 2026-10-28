@@ -190,7 +190,17 @@ def check_tools() -> int:
     }
     h12 = (now_eat.hour % 12) or 12
     h_word = hour_words.get(h12, "")
-    ok = (expected_hour_24 in reply) or (expected_hour_12 in reply) or (bool(h_word) and h_word in reply.lower())
+    # Natural British phrasing past :40 often names the upcoming hour (e.g. "ten to three")
+    next_h12 = ((now_eat.hour + 1) % 12) or 12
+    next_h_word = hour_words.get(next_h12, "")
+    next_hour_str = str(next_h12)
+
+    ok = (
+        (expected_hour_24 in reply)
+        or (expected_hour_12 in reply)
+        or (bool(h_word) and h_word in reply.lower())
+        or (now_eat.minute >= 40 and ((next_hour_str in reply) or (bool(next_h_word) and next_h_word in reply.lower())))
+    )
     return done("tools", ok, f"answered in {took:.1f}s: {reply!r} (expected hour {expected_hour_24} or {expected_hour_12})")
 
 
