@@ -18,6 +18,16 @@ ALLOWED_APPS: dict[str, list[str]] = {
     "code": ["code"],
 }
 
+APP_ALIASES: dict[str, str] = {
+    "calculator": "calc",
+    "google chrome": "chrome",
+    "edge": "msedge",
+    "microsoft edge": "msedge",
+    "vscode": "code",
+    "visual studio code": "code",
+    "file explorer": "explorer",
+}
+
 
 def _get_allowed_folders() -> list[Path]:
     userprofile = Path(os.path.expandvars(r"%USERPROFILE%")).resolve()
@@ -35,6 +45,7 @@ def open_app(app_name: str, target: str | None = None) -> str:
     name_clean = app_name.strip().lower()
     if name_clean.endswith(".exe"):
         name_clean = name_clean[:-4]
+    name_clean = APP_ALIASES.get(name_clean, name_clean)
 
     if name_clean not in ALLOWED_APPS:
         allowed_list = ", ".join(sorted(ALLOWED_APPS.keys()))

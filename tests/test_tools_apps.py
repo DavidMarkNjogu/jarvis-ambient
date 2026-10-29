@@ -13,8 +13,8 @@ def test_only_allowlisted_apps_open(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_run = MagicMock()
     monkeypatch.setattr("subprocess.Popen", mock_run)
 
-    # Allowed apps should succeed
-    for app in ["chrome", "msedge", "notepad", "calc", "explorer", "code"]:
+    # Allowed apps and aliases should succeed
+    for app in ["chrome", "msedge", "notepad", "calc", "explorer", "code", "calculator", "google chrome", "vscode"]:
         res = open_app(app)
         assert "opened" in res.lower()
 
