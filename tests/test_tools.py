@@ -213,3 +213,20 @@ def test_secrets_are_not_written_to_the_log(tmp_path: Path) -> None:
     assert args["data"] == "hello"
     assert "AIzaSy" not in json.dumps(entry)
     assert "gsk_secret" not in json.dumps(entry)
+
+
+def test_memory_tools_registration_and_risk() -> None:
+    from jarvis.tools import default_registry
+    registry = default_registry()
+    rem = registry.get("remember")
+    rec = registry.get("recall")
+    forg = registry.get("forget")
+
+    assert rem is not None
+    assert rem.risk == "safe"
+
+    assert rec is not None
+    assert rec.risk == "safe"
+
+    assert forg is not None
+    assert forg.risk == "confirm"

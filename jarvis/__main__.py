@@ -11,6 +11,7 @@ from rich.console import Console
 
 from .brain import AllProvidersFailed, Brain
 from .config import load_settings
+from .memory import Memory
 from .personality import system_prompt
 from .providers import Provider, ProviderError
 
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from .tools import default_registry
     tools = default_registry()
+    memory = Memory()
 
     providers = [Provider(cfg) for cfg in settings.providers]
     brain = Brain(
@@ -50,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
             settings.user_name,
             mode="text",
             tools=[t.name for t in tools.list_tools()],
+            profile_facts=memory.get_profile_facts(),
         ),
         history_turns=settings.history_turns,
         on_failure=lambda err: console.print(f"[dim]  ✗ {err.provider}: {err.reason}[/dim]"),
@@ -57,32 +60,45 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.question:
-        return 0 if answer(console, brain, " ".join(args.question)) else 1
+        try:
+            return 0 if answer(console, brain, " ".join(args.question)) else 1
+        finally:
+            memory.close()
 
     console.print("[bold cyan]J.A.R.V.I.S.[/bold cyan] [dim]online · text mode · type /help[/dim]")
     show_brain(console, providers, settings.skipped)
-    while True:
+    try:
+        while True:
+            try:
+                text = console.input("\n[bold]you ›[/bold] ").strip()
+            except (EOFError, KeyboardInterrupt):
+                console.print()
+                break
+            if not text:
+                continue
+            command = text.lower()
+            if command in {"/quit", "/exit", "quit", "exit"}:
+                break
+            if command == "/help":
+                console.print(HELP)
+            elif command == "/reset":
+                brain.reset()
+                console.print("[dim]Conversation forgotten.[/dim]")
+            elif command == "/brain":
+                show_brain(console, providers, settings.skipped)
+            elif command == "/models":
+                show_models(console, providers)
+            else:
+                answer(console, brain, text)
+    finally:
         try:
-            text = console.input("\n[bold]you ›[/bold] ").strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print()
-            break
-        if not text:
-            continue
-        command = text.lower()
-        if command in {"/quit", "/exit", "quit", "exit"}:
-            break
-        if command == "/help":
-            console.print(HELP)
-        elif command == "/reset":
-            brain.reset()
-            console.print("[dim]Conversation forgotten.[/dim]")
-        elif command == "/brain":
-            show_brain(console, providers, settings.skipped)
-        elif command == "/models":
-            show_models(console, providers)
-        else:
-            answer(console, brain, text)
+            user_turns = [m.get("content", "") for m in brain.history if m.get("role") == "user"]
+            if user_turns:
+                summary = f"Session at {datetime.now().strftime('%Y-%m-%d %H:%M')}: {len(user_turns)} turns. Queries: {'; '.join(user_turns[:5])}"
+                memory.save_session_summary(summary)
+        except Exception:
+            pass
+        memory.close()
     console.print("[dim]Jarvis offline.[/dim]")
     return 0
 

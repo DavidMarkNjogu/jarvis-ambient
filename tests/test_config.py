@@ -72,3 +72,10 @@ def test_prompt_lists_exactly_the_registered_tools():
     empty_prompt = system_prompt("David", tools=[])
     assert "get_time" not in empty_prompt
     assert "not connected" in empty_prompt.lower()
+
+
+def test_prompt_includes_profile_facts() -> None:
+    facts = ["David's sister is called Amina", "David prefers tea over coffee"]
+    prompt = system_prompt("David", profile_facts=facts)
+    for f in facts:
+        assert f in prompt

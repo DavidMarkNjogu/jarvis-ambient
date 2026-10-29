@@ -15,6 +15,7 @@ from rich.console import Console
 
 from .brain import AllProvidersFailed, Brain
 from .config import load_settings, voice_settings_from_env
+from .memory import Memory
 from .personality import system_prompt
 from .providers import Provider, ProviderError
 from .speech import SentenceBuffer
@@ -101,6 +102,7 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     from .tools import default_registry
     tools = default_registry()
 
+    memory = Memory()
     brain = Brain(
         [Provider(cfg) for cfg in settings.providers],
         system_prompt=lambda: system_prompt(
@@ -108,6 +110,7 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
             mode="voice",
             voice_name=mouth.label,
             tools=[t.name for t in tools.list_tools()],
+            profile_facts=memory.get_profile_facts(),
         ),
         history_turns=settings.history_turns,
         on_failure=lambda err: console.print(f"[dim]  ✗ {err.provider}: {err.reason}[/dim]"),
@@ -266,6 +269,14 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
         mouth.close()
         if visual:
             visual.stop()
+        try:
+            user_turns = [m.get("content", "") for m in brain.history if m.get("role") == "user"]
+            if user_turns:
+                summary = f"Voice session: {len(user_turns)} turns. Queries: {'; '.join(user_turns[:5])}"
+                memory.save_session_summary(summary)
+        except Exception:
+            pass
+        memory.close()
         console.print("[dim]Jarvis offline.[/dim]")
     return 0
 

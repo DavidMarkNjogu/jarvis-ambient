@@ -1,14 +1,15 @@
-# Done Contract: Dual-Lens QA & Anti-Drift Audit (/loop)
+# Done Contract: Phase 5 - Memory (It knows who you are)
 
-StartedAt: 2026-10-29T02:38:41+03:00
-Timeline: 35m
+StartedAt: 2026-10-29T17:29:20+03:00
 
 ## Acceptance Criteria
-- [x] Phase 1 Plan-vs-Diff Anti-Drift Audit: compare `phase-4-tools` against `master` across all 4 anti-drift vectors (Scope Inflation, Omissions, Architectural Divergence, Visual/Design Anti-Slop).
-- [x] Technical Verification: Run full test suite with 100% pass rate (131 passed, 0 failures).
-- [x] Live Gate & Hearing Verification: Run live checks (`scripts/verify.py --phase 4`) and test audio input capture to verify microphone hearing pipeline.
-- [x] Mutation Verification Check: Verify all Phase 4 files (`tools/__init__.py`, `tools/apps.py`, `tools/timers.py`, `tools/info.py`, `brain.py`) maintain >= 70% mutation caught rate.
-- [x] Deliverable Audit Report: Document plan-vs-diff matrix, drift findings, audio pipeline diagnosis, and recommendations in accordance with the `qa` skill format.
-- [x] Git Discipline: Clean working tree, granular commits.
-
-[Invariants: ~/.gemini/user-invariants.md. Marcus's latest message overrides standing rules.]
+- [x] P5-01: A remembered fact survives closing and reopening the database (tests/test_memory.py::test_remembered_fact_survives_a_new_connection)
+- [x] P5-02: Recall finds relevant fact by keyword and does not return unrelated ones (tests/test_memory.py::test_recall_finds_relevant_fact_by_keyword)
+- [x] P5-03: Forgetting removes a fact and it is never recalled again (tests/test_memory.py::test_forget_removes_the_fact_and_it_is_not_recalled)
+- [x] P5-04: Profile facts are loaded into system prompt at startup (tests/test_config.py::test_prompt_includes_profile_facts)
+- [x] P5-05: Memory refuses to store API keys, passwords and card numbers (tests/test_memory.py::test_refuses_to_store_api_keys_and_passwords)
+- [x] P5-06: A session summary is saved and can be retrieved in a later session (tests/test_memory.py::test_session_summary_is_saved_and_retrievable)
+- [x] P5-L1: Live check passes across separate Python processes (scripts/live_checks.py memory)
+- [x] Tools registered: remember, recall, forget available to Brain
+- [x] Mutation gate: scripts/verify.py --mutate jarvis/memory.py passes (>= 60%) [89% achieved]
+- [x] Verification: scripts/verify.py passes with 0 failures

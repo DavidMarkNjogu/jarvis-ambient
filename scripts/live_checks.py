@@ -204,6 +204,62 @@ def check_tools() -> int:
     return done("tools", ok, f"answered in {took:.1f}s: {reply!r} (expected hour {expected_hour_24} or {expected_hour_12})")
 
 
+def check_memory() -> int:
+    import subprocess
+    import tempfile
+    import uuid
+
+    db_path = Path(tempfile.gettempdir()) / f"jarvis_live_memory_{uuid.uuid4().hex[:8]}.db"
+    test_token = f"live_fact_{uuid.uuid4().hex[:8]}"
+    fact_text = f"David's secret hobby is stargazing {test_token}"
+
+    started = time.perf_counter()
+    try:
+        # Process 1: Write fact
+        code1 = subprocess.run(
+            [sys.executable, "-c", f"""
+from jarvis.memory import Memory
+mem = Memory(db_path={str(db_path)!r})
+mem.remember({fact_text!r})
+mem.close()
+"""],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if code1.returncode != 0:
+            return done("memory", False, f"process 1 failed: {code1.stderr.strip()}")
+
+        # Process 2: Read fact in fresh process
+        code2 = subprocess.run(
+            [sys.executable, "-c", f"""
+import sys
+from jarvis.memory import Memory
+mem = Memory(db_path={str(db_path)!r})
+facts = mem.recall({test_token!r})
+mem.close()
+if not facts or {test_token!r} not in facts[0]:
+    sys.exit(1)
+"""],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if code2.returncode != 0:
+            return done("memory", False, f"process 2 failed: {code2.stderr.strip()}")
+
+        took = time.perf_counter() - started
+        return done("memory", True, f"persisted fact across 2 processes in {took:.2f}s")
+    finally:
+        try:
+            if db_path.exists():
+                db_path.unlink(missing_ok=True)
+            for extra in (f"{db_path}-wal", f"{db_path}-shm"):
+                Path(extra).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 CHECKS = {
     "brain": check_brain,
     "stt": check_stt,
@@ -211,6 +267,7 @@ CHECKS = {
     "e2e": check_e2e,
     "wake": check_wake,
     "tools": check_tools,
+    "memory": check_memory,
 }
 
 

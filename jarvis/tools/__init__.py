@@ -225,4 +225,83 @@ def default_registry() -> ToolRegistry:
         )
     )
 
+    registry.register(
+        ToolDef(
+            name="remember",
+            description="Store a personal fact, preference, or detail about the user into persistent memory.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "fact": {"type": "string", "description": "The fact or preference to remember"},
+                    "category": {"type": "string", "description": "Optional category, e.g. profile, preference, family"},
+                },
+                "required": ["fact"],
+            },
+            handler=tool_remember,
+            risk="safe",
+        )
+    )
+
+    registry.register(
+        ToolDef(
+            name="recall",
+            description="Search persistent memory for facts matching a keyword.",
+            parameters={
+                "type": "object",
+                "properties": {"keyword": {"type": "string", "description": "Keyword to look up in memory"}},
+                "required": ["keyword"],
+            },
+            handler=tool_recall,
+            risk="safe",
+        )
+    )
+
+    registry.register(
+        ToolDef(
+            name="forget",
+            description="Delete saved memories matching a keyword. Deletes data permanently.",
+            parameters={
+                "type": "object",
+                "properties": {"keyword": {"type": "string", "description": "Keyword matching memories to delete"}},
+                "required": ["keyword"],
+            },
+            handler=tool_forget,
+            risk="confirm",
+        )
+    )
+
     return registry
+
+
+def tool_remember(fact: str, category: str = "profile") -> str:
+    from ..memory import Memory
+    mem = Memory()
+    try:
+        mem.remember(fact, category=category)
+        return f"Remembered: {fact}"
+    finally:
+        mem.close()
+
+
+def tool_recall(keyword: str) -> str:
+    from ..memory import Memory
+    mem = Memory()
+    try:
+        facts = mem.recall(keyword)
+        if not facts:
+            return f"No memories found matching '{keyword}'."
+        return "\n".join(f"- {f}" for f in facts)
+    finally:
+        mem.close()
+
+
+def tool_forget(keyword: str) -> str:
+    from ..memory import Memory
+    mem = Memory()
+    try:
+        count = mem.forget(keyword)
+        if count == 0:
+            return f"No memories found matching '{keyword}' to forget."
+        return f"Forgotten {count} memor{'y' if count == 1 else 'ies'} matching '{keyword}'."
+    finally:
+        mem.close()

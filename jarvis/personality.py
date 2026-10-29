@@ -11,6 +11,7 @@ def system_prompt(
     mode: str = "voice",
     voice_name: str = "George",
     tools: list[str] | None = None,
+    profile_facts: list[str] | None = None,
 ) -> str:
     now = now or datetime.now()
     if user_name:
@@ -48,8 +49,13 @@ def system_prompt(
         "and never pretend you did it. If you are unsure of a fact, say so."
     )
 
+    profile = ""
+    if profile_facts:
+        facts_block = "\n".join(f"• {f}" for f in profile_facts)
+        profile = f"\n\nWhat you know about {user_name or 'the user'}:\n{facts_block}"
+
     return f"""You are J.A.R.V.I.S., a personal AI assistant running on the user's own computer.
-{who}
+{who}{profile}
 
 Personality: calm, capable and quietly witty in a dry British way. Loyal and direct, never fawning.
 
