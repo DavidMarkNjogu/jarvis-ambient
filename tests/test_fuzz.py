@@ -191,3 +191,71 @@ def test_fuzz_web_search_untrusted_wrapping() -> None:
         assert "Title" in res["untrusted_content"]
         # Scripts and HTML tags are sanitized away
         assert "<script>" not in res["untrusted_content"]
+
+
+def test_fuzz_vision_downscale_extreme_dimensions() -> None:
+    """Fuzz downscale_image with extreme aspect ratios, 1x1, 10000x1, and zero-byte buffers."""
+    from jarvis.vision import downscale_image
+
+    # 1. Square 1x1
+    raw = b"\xff\x00\x00"
+    out, w, h = downscale_image(raw, 1, 1, max_width=1024)
+    assert out == raw
+    assert w == 1 and h == 1
+
+    # 2. Ultra-wide panorama (4000x2)
+    ultra_wide = (b"\x12\x34\x56" * 4000) * 2
+    out, w, h = downscale_image(ultra_wide, 4000, 2, max_width=1000)
+    assert w == 1000
+    assert h == 0 or h == 1
+    assert len(out) == w * h * 3
+
+    # 3. Ultra-tall banner (2x4000)
+    ultra_tall = (b"\xaa\xbb\xcc" * 2) * 4000
+    out, w, h = downscale_image(ultra_tall, 2, 4000, max_width=1000)
+    # Width 2 <= 1000, returned as-is
+    assert w == 2
+    assert h == 4000
+    assert len(out) == len(ultra_tall)
+
+
+def test_fuzz_memory_search_adversarial_queries(tmp_path: Path) -> None:
+    """Fuzz Memory.recall and search_session_summaries with adversarial SQLite patterns."""
+    from jarvis.memory import Memory
+
+    db_path = tmp_path / "fuzz_mem.db"
+    mem = Memory(db_path=db_path)
+    mem.remember("David prefers Kenyan purple tea with lemon", category="preference")
+    mem.save_session_summary("David discussed Phase 6 screen vision and test automation.")
+
+    fuzz_queries = [
+        "",
+        "   ",
+        "%",
+        "%%%",
+        "_",
+        "___",
+        "' OR 1=1 --",
+        "'; DELETE FROM facts; --",
+        "\\x00\\x01",
+        "?",
+        "*[a-z]",
+        "MATCH '\"'",
+        "tea%",
+        "tea_",
+        "A" * 1000,
+    ]
+
+    for q in fuzz_queries:
+        # Must execute safely without unhandled SQLite syntax crashes or dropping data
+        recalled = mem.recall(q)
+        assert isinstance(recalled, list)
+        summaries = mem.search_session_summaries(q)
+        assert isinstance(summaries, list)
+
+    # Confirm original fact and table remain intact
+    facts = mem.recall("Kenyan")
+    assert len(facts) == 1
+    assert "purple tea" in facts[0]
+    mem.close()
+
