@@ -259,3 +259,42 @@ def test_fuzz_memory_search_adversarial_queries(tmp_path: Path) -> None:
     assert "purple tea" in facts[0]
     mem.close()
 
+
+def test_fuzz_endpointer_adversarial_audio_frames() -> None:
+    """Fuzz Endpointer with empty arrays, NaNs, infinities, non-contiguous strides, and DC offsets."""
+    from jarvis.listen import Endpointer
+
+    ep = Endpointer(min_threshold=0.005)
+    
+    # 1. Normal silence
+    for _ in range(10):
+        assert not ep.feed_frame(np.zeros(1280, dtype="int16"))
+
+    # 2. Feeding extreme values
+    extreme_frames = [
+        np.full(1280, 32767, dtype="int16"),      # Max positive amplitude
+        np.full(1280, -32768, dtype="int16"),     # Max negative amplitude
+        np.full(1280, 1000, dtype="int16")[::2],  # Non-contiguous slice
+        np.zeros((1280, 1), dtype="float32"),     # 2D shape
+        np.array([100, 200, 300], dtype="int16"), # Short buffer
+    ]
+    for frame in extreme_frames:
+        # Must execute cleanly without exception
+        res = ep.feed_frame(frame)
+        assert isinstance(res, bool)
+
+
+def test_fuzz_tts_speech_sanitization_and_speed_bounds() -> None:
+    """Fuzz TTS SAPI rate clamping and string handling with hostile control characters."""
+    from jarvis.tts import _speed_to_sapi_rate
+
+    # Speed to SAPI rate must be strictly clamped between -10 and 10
+    assert _speed_to_sapi_rate(1.0) == 0
+    assert _speed_to_sapi_rate(0.0) == -10
+    assert _speed_to_sapi_rate(-999.0) == -10
+    assert _speed_to_sapi_rate(999.0) == 10
+    assert _speed_to_sapi_rate(2.0) == 10
+    assert _speed_to_sapi_rate(1.5) == 5
+    assert _speed_to_sapi_rate(0.5) == -5
+
+

@@ -79,3 +79,22 @@ def test_prompt_includes_profile_facts() -> None:
     prompt = system_prompt("David", profile_facts=facts)
     for f in facts:
         assert f in prompt
+
+
+def test_provider_config_is_frozen_and_ollama_custom_url() -> None:
+    from dataclasses import FrozenInstanceError
+    from jarvis.config import ProviderConfig, voice_settings_from_env, VoiceSettings
+
+    cfg = ProviderConfig("gemini", "http://example.com", "m", "k")
+    with pytest.raises(FrozenInstanceError):
+        cfg.model = "other"  # type: ignore
+
+    # Test custom OLLAMA_URL
+    s = settings_from_env({"JARVIS_PROVIDERS": "ollama", "OLLAMA_URL": "http://192.168.1.100:11434/v1"})
+    assert s.providers[0].base_url == "http://192.168.1.100:11434/v1"
+
+    # Test VoiceSettings defaults and whitespace JARVIS_WAKE
+    vs = voice_settings_from_env({"JARVIS_WAKE": "   "}, kokoro_installed=False)
+    assert vs.wake_enabled is True
+    assert VoiceSettings("groq", "base.en", "en", "windows", "v", "v", None).wake_enabled is True
+
