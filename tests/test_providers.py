@@ -116,3 +116,34 @@ def test_tool_call_deltas_are_assembled():
     assert call["id"] == "call_abc"
     assert call["function"]["name"] == "get_time"
     assert json.loads(call["function"]["arguments"]) == {"zone": "Africa/Nairobi"}
+
+
+def test_image_is_sent_as_base64_data_url():
+    """P6-03: Provider handles multimodal content blocks containing image_url."""
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, content=sse(delta("I see an error dialog.")), headers={"content-type": "text/event-stream"})
+
+    image_data_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What is on my screen?"},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ],
+        }
+    ]
+
+    reply = "".join(provider_with(handler).stream(messages))
+    assert reply == "I see an error dialog."
+    sent_msgs = seen["body"]["messages"]
+    assert len(sent_msgs) == 1
+    parts = sent_msgs[0]["content"]
+    assert isinstance(parts, list)
+    assert parts[0]["type"] == "text"
+    assert parts[1]["type"] == "image_url"
+    assert parts[1]["image_url"]["url"].startswith("data:image/")
+

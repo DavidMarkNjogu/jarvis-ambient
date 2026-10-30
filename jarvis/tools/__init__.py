@@ -270,7 +270,48 @@ def default_registry() -> ToolRegistry:
         )
     )
 
+    registry.register(
+        ToolDef(
+            name="look_at_screen",
+            description="Take a screenshot of the user's primary screen to inspect code, errors, or visual state.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "max_width": {"type": "integer", "description": "Maximum width for the captured image", "minimum": 320, "maximum": 1920}
+                },
+            },
+            handler=tool_look_at_screen,
+            risk="safe",
+        )
+    )
+
+    registry.register(
+        ToolDef(
+            name="look_through_camera",
+            description="Capture a single frame from the camera to see what the user is showing.",
+            parameters={
+                "type": "object",
+                "properties": {},
+            },
+            handler=tool_look_through_camera,
+            risk="safe",
+        )
+    )
+
     return registry
+
+
+def tool_look_at_screen(max_width: int = 1024) -> str:
+    from ..vision import look_at_screen
+    data_url = look_at_screen(max_width=max_width)
+    return f"Screenshot captured successfully: {data_url[:40]}... (in-memory)"
+
+
+def tool_look_through_camera() -> str:
+    from ..vision import look_through_camera
+    data_url = look_through_camera()
+    return f"Camera frame captured successfully: {data_url[:40]}... (in-memory)"
+
 
 
 def tool_remember(fact: str, category: str = "profile") -> str:

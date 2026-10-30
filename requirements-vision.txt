@@ -1,0 +1,4 @@
+# Phase 6: Eyes (screen capture and optional camera)
+mss>=10.2.0
+# Optional camera capture (requires ~40 MB download when installed)
+# opencv-python-headless>=4.9

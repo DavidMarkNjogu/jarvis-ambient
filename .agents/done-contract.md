@@ -1,15 +1,16 @@
-# Done Contract: Phase 5 - Memory (It knows who you are)
+# DONE CONTRACT: Phase 6 - Eyes (Screen and Camera) QA Loop
+Mode: Continuous
+StartedAt: 2026-10-30T17:15:00Z
+Timeline: 120m
 
-StartedAt: 2026-10-29T17:29:20+03:00
-
-## Acceptance Criteria
-- [x] P5-01: A remembered fact survives closing and reopening the database (tests/test_memory.py::test_remembered_fact_survives_a_new_connection)
-- [x] P5-02: Recall finds relevant fact by keyword and does not return unrelated ones (tests/test_memory.py::test_recall_finds_relevant_fact_by_keyword)
-- [x] P5-03: Forgetting removes a fact and it is never recalled again (tests/test_memory.py::test_forget_removes_the_fact_and_it_is_not_recalled)
-- [x] P5-04: Profile facts are loaded into system prompt at startup (tests/test_config.py::test_prompt_includes_profile_facts)
-- [x] P5-05: Memory refuses to store API keys, passwords and card numbers (tests/test_memory.py::test_refuses_to_store_api_keys_and_passwords)
-- [x] P5-06: A session summary is saved and can be retrieved in a later session (tests/test_memory.py::test_session_summary_is_saved_and_retrievable)
-- [x] P5-L1: Live check passes across separate Python processes (scripts/live_checks.py memory)
-- [x] Tools registered: remember, recall, forget available to Brain
-- [x] Mutation gate: scripts/verify.py --mutate jarvis/memory.py passes (>= 60%) [89% achieved]
-- [x] Verification: scripts/verify.py passes with 0 failures
+## Checks
+- [x] Invariants 1 through 12 in `~/.gemini/user-invariants.md` verified and aligned
+- [x] P6-01: The screen tool captures, downsizes and encodes a screenshot for the vision model (`tests/test_vision.py::test_screenshot_is_downscaled_and_encoded`)
+- [x] P6-02: The camera opens only on an explicit request and is always released afterwards, even when capture fails (`tests/test_vision.py::test_camera_is_opened_only_for_an_explicit_request_and_closed_after`)
+- [x] P6-03: Images are sent to the provider in the correct base64 message format (`tests/test_providers.py::test_image_is_sent_as_base64_data_url`)
+- [x] P6-04: Images are never written to disk unless the user asked to save one (`tests/test_vision.py::test_images_are_not_written_to_disk_unless_asked`)
+- [x] P6-L1: The real vision model reads text from an image (`scripts/live_checks.py vision`)
+- [x] P6-Pitfalls: Camera released on failure, zero memory/file leakage, primary monitor coordinates verified
+- [x] Mutation Gate: `scripts/verify.py --mutate jarvis/vision.py` passes (82% achieved, >= 60%)
+- [x] Whole Verification Gate: `scripts/verify.py` passes with 0 test failures (165 passed)
+- [x] Granular atomic git commit created (`type(scope): message`)

@@ -260,6 +260,59 @@ if not facts or {test_token!r} not in facts[0]:
             pass
 
 
+def check_vision() -> int:
+    """Live check for P6-L1: Vision model reads text from an image containing ERROR 4417."""
+    from jarvis.config import load_settings
+    from jarvis.providers import Provider
+
+    settings = load_settings()
+    if not settings.providers:
+        return done("vision", False, "no provider configured in .env")
+
+    # Generate a lightweight 1-bit or simple in-memory PNG with text 'ERROR 4417'
+    # using PowerShell or direct byte synthesis to avoid adding heavy image packages.
+    script = (
+        "Add-Type -AssemblyName System.Drawing; "
+        "$bmp = New-Object System.Drawing.Bitmap 300, 80; "
+        "$g = [System.Drawing.Graphics]::FromImage($bmp); "
+        "$g.Clear([System.Drawing.Color]::White); "
+        "$font = New-Object System.Drawing.Font('Arial', 24); "
+        "$brush = [System.Drawing.Brushes]::Black; "
+        "$g.DrawString('ERROR 4417', $font, $brush, 10, 20); "
+        "$ms = New-Object System.IO.MemoryStream; "
+        "$bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); "
+        "$b64 = [Convert]::ToBase64String($ms.ToArray()); "
+        "Write-Output $b64; "
+        "$g.Dispose(); $bmp.Dispose(); $ms.Dispose()"
+    )
+    res = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, text=True, timeout=30)
+    if res.returncode != 0 or not res.stdout.strip():
+        return done("vision", False, f"failed to generate test image: {res.stderr.strip()}")
+
+    b64_img = res.stdout.strip()
+    data_url = f"data:image/png;base64,{b64_img}"
+
+    provider = Provider(settings.providers[0])
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What error code or text is shown in this image? Reply with just the code or text."},
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ],
+        }
+    ]
+
+    started = time.perf_counter()
+    reply_chunks = list(provider.stream(messages))
+    reply = "".join(reply_chunks).strip()
+    took = time.perf_counter() - started
+
+    if "4417" in reply:
+        return done("vision", True, f"vision read '4417' in {took:.1f}s (reply: '{reply}')")
+    return done("vision", False, f"expected '4417' in reply, got: '{reply}'")
+
+
 CHECKS = {
     "brain": check_brain,
     "stt": check_stt,
@@ -268,6 +321,7 @@ CHECKS = {
     "wake": check_wake,
     "tools": check_tools,
     "memory": check_memory,
+    "vision": check_vision,
 }
 
 
