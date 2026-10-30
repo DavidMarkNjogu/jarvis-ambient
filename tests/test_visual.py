@@ -254,3 +254,34 @@ def test_visual_server_auto_open(monkeypatch: pytest.MonkeyPatch) -> None:
         assert opened[0] == url
     finally:
         server.stop()
+
+
+def test_launch_app_window_calls_popen_and_returns_true(monkeypatch: pytest.MonkeyPatch) -> None:
+    import os
+    import subprocess
+    from jarvis.visual import launch_app_window
+
+    calls = []
+
+    class FakePopen:
+        def __init__(self, cmd: list[str]) -> None:
+            calls.append(cmd)
+
+    monkeypatch.setattr(os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(subprocess, 'Popen', FakePopen)
+
+    ok = launch_app_window('http://127.0.0.1:5050', width=400, height=600)
+    assert ok is True
+    assert len(calls) == 1
+    assert '--app=http://127.0.0.1:5050' in calls[0]
+    assert '--window-size=400,600' in calls[0]
+
+    # When no candidate browser exists
+    monkeypatch.setattr(os.path, 'exists', lambda p: False)
+    assert launch_app_window('http://127.0.0.1:5050') is False
+
+
+def test_visual_server_default_arguments() -> None:
+    s = VisualServer()
+    assert s.auto_open is True
+    assert s.port >= 5050
