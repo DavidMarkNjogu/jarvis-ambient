@@ -148,7 +148,7 @@ def test_unlabeled_tools_default_to_confirm_first(tmp_path: Path) -> None:
 
 
 def test_every_call_is_logged_with_name_args_and_result(tmp_path: Path) -> None:
-    log_file = tmp_path / "tool-log.jsonl"
+    log_file = tmp_path / "nested" / "logs" / "tool-log.jsonl"
     registry = ToolRegistry(log_path=log_file)
     registry.register(
         ToolDef(

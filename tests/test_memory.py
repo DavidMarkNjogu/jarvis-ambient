@@ -7,13 +7,13 @@ from jarvis.memory import Memory
 
 
 def test_remembered_fact_survives_a_new_connection(tmp_path: Path) -> None:
-    db_file = tmp_path / "sub" / "memory.db"
+    db_file = tmp_path / "deep" / "nested" / "dir" / "memory.db"
     mem1 = Memory(db_path=db_file)
     row_id = mem1.remember("David's sister is called Amina", category="profile")
     assert row_id > 0
     mem1.close()
 
-    # Reopening on already existing parent dir
+    # Reopening on already existing parent dir (verifies exist_ok=True and parents=True)
     mem2 = Memory(db_path=db_file)
     try:
         facts = mem2.recall("sister")
