@@ -148,3 +148,35 @@ def test_kokoro_default_play_audio() -> None:
         kokoro_factory=lambda m, v: fake_kokoro,
     )
     assert voice._play_audio is True
+
+def test_mouth_set_voice_and_set_speed() -> None:
+    from jarvis.tts import Mouth
+
+    class FakeVoice:
+        def __init__(self):
+            self.label = 'fake-default'
+            self.speed = 1.0
+
+        def speak(self, text: str) -> None:
+            pass
+
+        def stop(self) -> None:
+            pass
+
+        def set_speed(self, speed: float) -> None:
+            self.speed = speed
+
+        def set_voice(self, name: str) -> None:
+            self.label = f'fake-{name}'
+
+    fake_voice = FakeVoice()
+    mouth = Mouth(lambda: fake_voice)
+    try:
+        assert mouth.label == 'fake-default'
+        mouth.set_speed(1.5)
+        assert fake_voice.speed == 1.5
+        mouth.set_voice('Hazel')
+        assert fake_voice.label == 'fake-Hazel'
+        assert mouth.label == 'fake-Hazel'
+    finally:
+        mouth.close()

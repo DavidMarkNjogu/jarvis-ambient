@@ -194,6 +194,14 @@ class Mouth:
         if self._voice:
             self._voice.stop()
 
+    def set_speed(self, speed: float) -> None:
+        if self._voice:
+            self._voice.set_speed(speed)
+
+    def set_voice(self, name: str) -> None:
+        if self._voice:
+            self._voice.set_voice(name)
+
     def close(self) -> None:
         self._queue.put(None)
 
