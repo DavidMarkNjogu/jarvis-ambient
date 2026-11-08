@@ -282,6 +282,101 @@ def test_launch_app_window_calls_popen_and_returns_true(monkeypatch: pytest.Monk
 
 
 def test_visual_server_default_arguments() -> None:
-    s = VisualServer()
-    assert s.auto_open is True
+    from jarvis.visual import VisualHandler
+    assert VisualHandler.close_connection is True
+    s = VisualServer(auto_open=False)
+    assert s.auto_open is False
     assert s.port >= 5050
+    url = s.start()
+    try:
+        assert s._thread is not None
+        assert s._thread.daemon is True
+    finally:
+        s.stop()
+
+
+def test_visual_server_voice_settings_api() -> None:
+    voice_set: list[str] = []
+    speed_set: list[float] = []
+
+    voice_state = {
+        "voices": ["Microsoft George", "Microsoft Hazel"],
+        "active_voice": "Microsoft George",
+        "speed": 1.1,
+        "engine": "windows",
+    }
+
+    def _set_voice(name: str) -> None:
+        voice_set.append(name)
+        voice_state["active_voice"] = name
+
+    def _set_speed(speed: float) -> None:
+        speed_set.append(speed)
+        voice_state["speed"] = speed
+
+    server = VisualServer(
+        port=find_free_port(5500),
+        auto_open=False,
+        on_set_voice=_set_voice,
+        on_set_speed=_set_speed,
+        get_voice_settings=lambda: voice_state,
+    )
+    url = server.start()
+    try:
+        # 1. GET /api/voice/settings
+        with urllib.request.urlopen(f"{url}/api/voice/settings") as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["active_voice"] == "Microsoft George"
+            assert data["speed"] == 1.1
+            assert "Microsoft Hazel" in data["voices"]
+
+        # 2. POST /api/voice/settings valid
+        payload = json.dumps({"voice": "Hazel", "speed": 1.25}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{url}/api/voice/settings",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            assert resp_data["ok"] is True
+            assert resp_data["active_voice"] == "Hazel"
+            assert resp_data["speed"] == 1.25
+        assert voice_set == ["Hazel"]
+        assert speed_set == [1.25]
+
+        # 3. POST /api/voice/settings out of range speed
+        req_bad = urllib.request.Request(
+            f"{url}/api/voice/settings",
+            data=json.dumps({"speed": 5.0}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req_bad)
+        assert exc_info.value.code == 400
+
+        # 4. POST /api/voice/settings invalid JSON
+        req_invalid = urllib.request.Request(
+            f"{url}/api/voice/settings",
+            data=b"not-json",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req_invalid)
+        assert exc_info.value.code == 400
+    finally:
+        server.stop()
+
+
+def test_visualizer_html_has_voice_and_speed_controls() -> None:
+    from jarvis.visual import STATIC_DIR
+    html_path = STATIC_DIR / "visualizer.html"
+    content = html_path.read_text(encoding="utf-8")
+    assert 'id="voiceSelect"' in content
+    assert 'id="speedRange"' in content
+    assert 'id="speedBadge"' in content

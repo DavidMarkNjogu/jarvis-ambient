@@ -89,10 +89,33 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     if not args.push_to_talk and getattr(vs, "wake_enabled", True):
         wake_detector = init_wake_detector(vs, console)
 
+    current_speed = getattr(vs, "voice_speed", 1.1)
+
+    def _set_speed(speed: float) -> None:
+        nonlocal current_speed
+        current_speed = speed
+        mouth.set_speed(speed)
+
+    def _set_voice(name: str) -> None:
+        mouth.set_voice(name)
+
+    def _get_voice_info() -> dict[str, Any]:
+        return {
+            "voices": list_voices(vs.tts_engine),
+            "active_voice": mouth.label,
+            "speed": current_speed,
+            "engine": vs.tts_engine,
+        }
+
     visual: VisualServer | None = None
     if not args.no_visual and os.environ.get("JARVIS_VISUAL", "1") != "0":
         try:
-            visual = VisualServer(port=args.port)
+            visual = VisualServer(
+                port=args.port,
+                on_set_voice=_set_voice,
+                on_set_speed=_set_speed,
+                get_voice_settings=_get_voice_info,
+            )
             url = visual.start()
             console.print(f"[dim]aperture: {url}[/dim]")
         except Exception as err:
@@ -184,12 +207,12 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
                 if len(parts) > 1:
                     try:
                         new_speed = float(parts[1])
-                        mouth.set_speed(new_speed)
+                        _set_speed(new_speed)
                         console.print(f"[dim]Voice speed set to {new_speed}x.[/dim]")
                     except ValueError:
                         console.print("[dim]Usage: /speed <number between 0.5 and 2.5>[/dim]")
                 else:
-                    console.print(f"[dim]Current voice speed: {getattr(vs, 'voice_speed', 1.1)}x. Usage: /speed <number>[/dim]")
+                    console.print(f"[dim]Current voice speed: {current_speed}x. Usage: /speed <number>[/dim]")
                 continue
 
             if typed.startswith("/voices"):

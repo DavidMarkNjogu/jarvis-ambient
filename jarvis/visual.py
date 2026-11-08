@@ -15,6 +15,7 @@ import socket
 import threading
 import time
 import webbrowser
+from collections.abc import Callable
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,10 +28,18 @@ logger = logging.getLogger("jarvis.visual")
 class VisualBroadcaster:
     """Thread-safe event bus that broadcasts state events to connected SSE clients."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        on_set_voice: Callable[[str], None] | None = None,
+        on_set_speed: Callable[[float], None] | None = None,
+        get_voice_settings: Callable[[], dict[str, Any]] | None = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._subscribers: list[queue.Queue[str | None]] = []
         self._active = True
+        self.on_set_voice = on_set_voice
+        self.on_set_speed = on_set_speed
+        self.get_voice_settings = get_voice_settings
         self._current_state: dict[str, Any] = {
             "status": "idle",
             "text": "",
@@ -89,9 +98,10 @@ class VisualBroadcaster:
 
 
 class VisualHandler(BaseHTTPRequestHandler):
-    """Handles static asset serving and Server-Sent Events stream."""
+    """Handles static asset serving, voice modulation REST APIs, and SSE stream."""
 
     broadcaster: VisualBroadcaster = VisualBroadcaster()
+    close_connection = True
 
     def log_message(self, format: str, *args: Any) -> None:
         # Suppress noisy standard HTTP access logs in console
@@ -101,7 +111,15 @@ class VisualHandler(BaseHTTPRequestHandler):
         try:
             super().handle_one_request()
         except (ConnectionError, OSError):
-            self.close_connection = True
+            pass
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Connection", "close")
+        self.end_headers()
 
     def do_GET(self) -> None:
         try:
@@ -121,18 +139,86 @@ class VisualHandler(BaseHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(body)
-                self.close_connection = True
+            elif path == "/api/voice/settings":
+                data = {}
+                if self.broadcaster.get_voice_settings:
+                    try:
+                        data = self.broadcaster.get_voice_settings()
+                    except Exception:
+                        data = {}
+                body = json.dumps(data).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
             elif path == "/favicon.ico":
                 self.send_response(HTTPStatus.NO_CONTENT)
                 self.send_header("Connection", "close")
                 self.end_headers()
-                self.close_connection = True
             elif path == "/events":
                 self._handle_sse()
             else:
                 self.send_error(HTTPStatus.NOT_FOUND, "File not found")
         except (ConnectionError, OSError):
-            self.close_connection = True
+            pass
+
+    def do_POST(self) -> None:
+        try:
+            path = self.path.split("?")[0].rstrip("/")
+            if path == "/api/voice/settings":
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 65536:
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Payload too large")
+                    return
+                body_bytes = self.rfile.read(content_length)
+                try:
+                    payload = json.loads(body_bytes.decode("utf-8"))
+                except Exception:
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Invalid JSON")
+                    return
+
+                if not isinstance(payload, dict):
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Expected JSON object")
+                    return
+
+                if "voice" in payload and self.broadcaster.on_set_voice:
+                    voice_val = str(payload["voice"]).strip()
+                    if voice_val:
+                        self.broadcaster.on_set_voice(voice_val)
+
+                if "speed" in payload and self.broadcaster.on_set_speed:
+                    try:
+                        speed_val = float(payload["speed"])
+                        if 0.5 <= speed_val <= 2.5:
+                            self.broadcaster.on_set_speed(speed_val)
+                        else:
+                            self.send_error(HTTPStatus.BAD_REQUEST, "Speed out of range (0.5 to 2.5)")
+                            return
+                    except (ValueError, TypeError):
+                        self.send_error(HTTPStatus.BAD_REQUEST, "Speed must be numeric")
+                        return
+
+                resp_data = {"ok": True}
+                if self.broadcaster.get_voice_settings:
+                    try:
+                        resp_data.update(self.broadcaster.get_voice_settings())
+                    except Exception:
+                        pass
+                body = json.dumps(resp_data).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_error(HTTPStatus.NOT_FOUND, "Endpoint not found")
+        except (ConnectionError, OSError):
+            pass
 
     def _serve_file(self, file_path: Path, content_type: str) -> None:
         if not file_path.is_file():
@@ -146,7 +232,6 @@ class VisualHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(data)
-        self.close_connection = True
 
     def _handle_sse(self) -> None:
         try:
@@ -159,6 +244,7 @@ class VisualHandler(BaseHTTPRequestHandler):
         except (ConnectionError, OSError):
             return
 
+        self.close_connection = False
         client_queue = self.broadcaster.subscribe()
         try:
             while True:
@@ -175,6 +261,7 @@ class VisualHandler(BaseHTTPRequestHandler):
         except (ConnectionError, OSError):
             pass
         finally:
+            self.close_connection = True
             self.broadcaster.unsubscribe(client_queue)
 
 
@@ -230,8 +317,19 @@ def launch_app_window(url: str, width: int = 420, height: int = 580) -> bool:
 class VisualServer:
     """Manages the background visual HTTP/SSE server."""
 
-    def __init__(self, port: int = 5050, auto_open: bool = True) -> None:
-        self.broadcaster = VisualBroadcaster()
+    def __init__(
+        self,
+        port: int = 5050,
+        auto_open: bool = True,
+        on_set_voice: Callable[[str], None] | None = None,
+        on_set_speed: Callable[[float], None] | None = None,
+        get_voice_settings: Callable[[], dict[str, Any]] | None = None,
+    ) -> None:
+        self.broadcaster = VisualBroadcaster(
+            on_set_voice=on_set_voice,
+            on_set_speed=on_set_speed,
+            get_voice_settings=get_voice_settings,
+        )
         self.port = find_free_port(port)
         self.auto_open = auto_open
         self._server: SilentThreadingHTTPServer | None = None

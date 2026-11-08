@@ -126,6 +126,7 @@ def list_voices(
     results: list[str] = []
     if engine in {"windows", "auto"}:
         try:
+            _init_com()
             if sapi_factory is not None:
                 sapi = sapi_factory()
             else:

@@ -32,6 +32,33 @@
       </div>
     </main>
 
+    <section class="voice-modulation" aria-label="Voice Modulation Controls">
+      <div class="modulation-header">
+        <span class="modulation-tag">VOCAL MATRIX CONFIGURATION</span>
+        <span class="modulation-status" id="voiceSyncStatus">SYNCHRONIZED</span>
+      </div>
+
+      <div class="modulation-grid">
+        <div class="modulation-field">
+          <label for="voiceSelect" class="field-label">VOICE ARCHETYPE</label>
+          <div class="select-container">
+            <select id="voiceSelect" class="hud-select" aria-label="Select voice"></select>
+            <span class="select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+
+        <div class="modulation-field">
+          <div class="field-header">
+            <label for="speedRange" class="field-label">RATE MODULATION</label>
+            <span class="speed-badge" id="speedBadge">1.10x</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="speedRange" class="hud-range" min="0.5" max="2.0" step="0.05" value="1.1" aria-label="Adjust voice rate">
+          </div>
+        </div>
+      </div>
+    </section>
+
     <footer class="caption-dock">
       <div class="caption-label">STREAM TELEMETRY</div>
       <div class="caption-content" id="captionText">Awaiting command input...</div>
