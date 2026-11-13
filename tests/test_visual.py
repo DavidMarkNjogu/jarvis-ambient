@@ -380,3 +380,85 @@ def test_visualizer_html_has_voice_and_speed_controls() -> None:
     assert 'id="voiceSelect"' in content
     assert 'id="speedRange"' in content
     assert 'id="speedBadge"' in content
+
+
+def test_visual_server_chat_api() -> None:
+    received_commands: list[str] = []
+
+    def _command_handler(msg: str) -> str:
+        received_commands.append(msg)
+        return f"Echo: {msg}"
+
+    server = VisualServer(
+        port=find_free_port(5600),
+        auto_open=False,
+        on_command=_command_handler,
+    )
+    url = server.start()
+    try:
+        # 1. Valid command POST /api/chat
+        payload = json.dumps({"message": "status report"}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{url}/api/chat",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+            assert data["reply"] == "Echo: status report"
+        assert received_commands == ["status report"]
+
+        # 2. Invalid JSON
+        req_bad = urllib.request.Request(
+            f"{url}/api/chat",
+            data=b"invalid-json",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req_bad)
+        assert exc_info.value.code == 400
+
+        # 3. Empty payload
+        req_empty = urllib.request.Request(
+            f"{url}/api/chat",
+            data=json.dumps({"message": "   "}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req_empty)
+        assert exc_info.value.code == 400
+    finally:
+        server.stop()
+
+
+def test_visual_server_chat_api_unconfigured() -> None:
+    server = VisualServer(port=find_free_port(5650), auto_open=False)
+    url = server.start()
+    try:
+        payload = json.dumps({"message": "hello"}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{url}/api/chat",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 503
+    finally:
+        server.stop()
+
+
+def test_visualizer_html_has_command_and_voice_inputs() -> None:
+    from jarvis.visual import STATIC_DIR
+    html_path = STATIC_DIR / "visualizer.html"
+    content = html_path.read_text(encoding="utf-8")
+    assert 'id="commandForm"' in content
+    assert 'id="commandInput"' in content
+    assert 'id="micBtn"' in content
+    assert 'id="sendBtn"' in content

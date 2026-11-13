@@ -59,6 +59,19 @@
       </div>
     </section>
 
+    <section class="command-dock" aria-label="Command and Voice Input">
+      <form id="commandForm" class="command-form" autocomplete="off">
+        <button type="button" id="micBtn" class="hud-mic-btn" aria-label="Voice input">
+          <span class="mic-dot" aria-hidden="true"></span>
+          <span class="mic-label">VOX</span>
+        </button>
+        <div class="input-wrapper">
+          <input type="text" id="commandInput" class="hud-input" placeholder="› Enter query or command..." aria-label="Command prompt">
+        </div>
+        <button type="submit" id="sendBtn" class="hud-send-btn" aria-label="Transmit command">TRANSMIT</button>
+      </form>
+    </section>
+
     <footer class="caption-dock">
       <div class="caption-label">STREAM TELEMETRY</div>
       <div class="caption-content" id="captionText">Awaiting command input...</div>

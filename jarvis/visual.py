@@ -33,6 +33,7 @@ class VisualBroadcaster:
         on_set_voice: Callable[[str], None] | None = None,
         on_set_speed: Callable[[float], None] | None = None,
         get_voice_settings: Callable[[], dict[str, Any]] | None = None,
+        on_command: Callable[[str], str] | None = None,
     ) -> None:
         self._lock = threading.Lock()
         self._subscribers: list[queue.Queue[str | None]] = []
@@ -40,6 +41,7 @@ class VisualBroadcaster:
         self.on_set_voice = on_set_voice
         self.on_set_speed = on_set_speed
         self.get_voice_settings = get_voice_settings
+        self.on_command = on_command
         self._current_state: dict[str, Any] = {
             "status": "idle",
             "text": "",
@@ -215,6 +217,45 @@ class VisualHandler(BaseHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(body)
+            elif path == "/api/chat":
+                if not self.broadcaster.on_command:
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "Command brain not connected")
+                    return
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 65536:
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Payload too large")
+                    return
+                body_bytes = self.rfile.read(content_length)
+                try:
+                    payload = json.loads(body_bytes.decode("utf-8"))
+                except Exception:
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Invalid JSON")
+                    return
+
+                if not isinstance(payload, dict):
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Expected JSON object")
+                    return
+
+                message = str(payload.get("message", "")).strip()
+                if not message:
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Message cannot be empty")
+                    return
+
+                try:
+                    reply = self.broadcaster.on_command(message)
+                except Exception as err:
+                    self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Command execution failed: {err}")
+                    return
+
+                resp_data = {"ok": True, "reply": reply}
+                body = json.dumps(resp_data).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
             else:
                 self.send_error(HTTPStatus.NOT_FOUND, "Endpoint not found")
         except (ConnectionError, OSError):
@@ -324,11 +365,13 @@ class VisualServer:
         on_set_voice: Callable[[str], None] | None = None,
         on_set_speed: Callable[[float], None] | None = None,
         get_voice_settings: Callable[[], dict[str, Any]] | None = None,
+        on_command: Callable[[str], str] | None = None,
     ) -> None:
         self.broadcaster = VisualBroadcaster(
             on_set_voice=on_set_voice,
             on_set_speed=on_set_speed,
             get_voice_settings=get_voice_settings,
+            on_command=on_command,
         )
         self.port = find_free_port(port)
         self.auto_open = auto_open

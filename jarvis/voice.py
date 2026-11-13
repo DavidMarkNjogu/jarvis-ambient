@@ -139,6 +139,65 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
         on_failure=lambda err: console.print(f"[dim]  ✗ {err.provider}: {err.reason}[/dim]"),
         tools=tools,
     )
+
+    def _handle_ui_command(cmd_text: str) -> str:
+        cmd_text = cmd_text.strip()
+        if not cmd_text:
+            return ""
+        if cmd_text.startswith("/speed"):
+            parts = cmd_text.split()
+            if len(parts) > 1:
+                try:
+                    s = float(parts[1])
+                    _set_speed(s)
+                    return f"Voice speed set to {s}x."
+                except ValueError:
+                    return "Usage: /speed <number between 0.5 and 2.5>"
+            return f"Current voice speed: {current_speed}x."
+
+        if cmd_text.startswith("/voice"):
+            parts = cmd_text.split(maxsplit=1)
+            if len(parts) > 1:
+                _set_voice(parts[1].strip())
+                return f"Active voice switched to: {mouth.label}"
+            return f"Current voice: {mouth.label}"
+
+        if cmd_text.startswith("/voices"):
+            return "Available voices: " + ", ".join(list_voices(vs.tts_engine))
+
+        if cmd_text in {"/reset", "reset"}:
+            brain.reset()
+            return "Conversation forgotten."
+
+        if visual:
+            visual.set_state("thinking", f"Processing: {cmd_text}")
+        sentences = SentenceBuffer()
+        reply_pieces = []
+        try:
+            for piece in brain.ask(cmd_text):
+                reply_pieces.append(piece)
+                for s in sentences.feed(piece):
+                    if visual:
+                        visual.set_state("speaking", s)
+                    mouth.say(s)
+            for s in sentences.flush():
+                if visual:
+                    visual.set_state("speaking", s)
+                mouth.say(s)
+            mouth.wait()
+        except Exception as exc:
+            err_msg = f"Error processing query: {exc}"
+            if visual:
+                visual.set_state("error", err_msg)
+            return err_msg
+
+        full_reply = "".join(reply_pieces)
+        if visual:
+            visual.set_state("idle", full_reply)
+        return full_reply
+
+    if visual:
+        visual.broadcaster.on_command = _handle_ui_command
     from .listen import MicStream, record_utterance
 
     mode_label = "hands-free 'Hey Jarvis'" if wake_detector else "press-Enter"

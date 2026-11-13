@@ -7,6 +7,10 @@
   const speedRange = document.getElementById("speedRange");
   const speedBadge = document.getElementById("speedBadge");
   const voiceSyncStatus = document.getElementById("voiceSyncStatus");
+  const commandForm = document.getElementById("commandForm");
+  const commandInput = document.getElementById("commandInput");
+  const micBtn = document.getElementById("micBtn");
+  const sendBtn = document.getElementById("sendBtn");
   const body = document.body;
 
   const STATUS_LABELS = {
@@ -130,6 +134,123 @@
             setSyncStatus("FAILED", true);
           });
       }, 300);
+    });
+  }
+
+  function submitCommand(rawText) {
+    if (!rawText || !rawText.trim()) return;
+    const msg = rawText.trim();
+    if (commandInput) {
+      commandInput.value = "";
+    }
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.textContent = "SENDING...";
+    }
+    updateState({ status: "thinking", text: "Processing: " + msg });
+
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg })
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("Server error " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (data && data.reply) {
+          updateState({ status: "speaking", text: data.reply });
+        } else {
+          updateState({ status: "idle", text: "Acknowledged." });
+        }
+      })
+      .catch(function (err) {
+        console.error("Command error:", err);
+        updateState({ status: "error", text: "Command error: " + err.message });
+      })
+      .finally(function () {
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          sendBtn.textContent = "TRANSMIT";
+        }
+      });
+  }
+
+  if (commandForm) {
+    commandForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (commandInput) {
+        submitCommand(commandInput.value);
+      }
+    });
+  }
+
+  // Web Speech Recognition for VOX button
+  let recognition = null;
+  let isRecording = false;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onstart = function () {
+      isRecording = true;
+      if (micBtn) {
+        micBtn.classList.add("recording");
+      }
+      updateState({ status: "listening", text: "Listening via browser microphone..." });
+    };
+
+    recognition.onresult = function (event) {
+      if (event.results && event.results[0] && event.results[0][0]) {
+        const transcript = event.results[0][0].transcript;
+        if (commandInput) {
+          commandInput.value = transcript;
+        }
+        submitCommand(transcript);
+      }
+    };
+
+    recognition.onerror = function (event) {
+      isRecording = false;
+      if (micBtn) {
+        micBtn.classList.remove("recording");
+      }
+      updateState({ status: "error", text: "Voice capture notice: " + (event.error || "no speech detected") });
+      setTimeout(function () {
+        updateState({ status: "idle", text: "" });
+      }, 3000);
+    };
+
+    recognition.onend = function () {
+      isRecording = false;
+      if (micBtn) {
+        micBtn.classList.remove("recording");
+      }
+    };
+  }
+
+  if (micBtn) {
+    micBtn.addEventListener("click", function () {
+      if (!recognition) {
+        if (captionText) {
+          captionText.textContent = "Browser speech recognition unavailable. Type command directly.";
+        }
+        return;
+      }
+      if (isRecording) {
+        recognition.stop();
+      } else {
+        try {
+          recognition.start();
+        } catch (err) {
+          console.error("Speech recognition start failed:", err);
+        }
+      }
     });
   }
 
